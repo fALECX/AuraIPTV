@@ -1,4 +1,4 @@
-import { MOCK_CATEGORIES } from '../data/mockData';
+import { useState, useEffect } from 'react';
 import './DetailScreen.css';
 
 const BackIcon = () => (
@@ -9,9 +9,9 @@ const BackIcon = () => (
 const PlayFill = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21" /></svg>
 );
-const PlusIcon = () => (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+const HeartIcon = ({ filled }) => (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill={filled ? '#ef4444' : 'none'} stroke={filled ? '#ef4444' : 'currentColor'} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
     </svg>
 );
 const ShareIcon = () => (
@@ -28,16 +28,35 @@ const MOCK_CAST = [
     { name: 'Javier B.', avatar: 'https://i.pravatar.cc/60?img=7' },
 ];
 
-export default function DetailScreen({ item, onPlay, onBack }) {
-    if (!item) return null;
+export default function DetailScreen({ item, onPlay, onBack, credentials }) {
+    const [isFavorite, setIsFavorite] = useState(false);
 
-    // Pull random related items from same category or movies
-    const related = MOCK_CATEGORIES.find(c => c.items.some(i => i.id === item.id))?.items.filter(i => i.id !== item.id) ?? MOCK_CATEGORIES[1].items.slice(0, 5);
+    const favKey = credentials ? `aura_favs_${credentials.username}` : 'aura_favs_guest';
+
+    useEffect(() => {
+        const favs = JSON.parse(localStorage.getItem(favKey) || '[]');
+        setIsFavorite(favs.some(f => f.id === item.id));
+    }, [item.id, favKey]);
+
+    const toggleFavorite = () => {
+        const favs = JSON.parse(localStorage.getItem(favKey) || '[]');
+        let updated;
+        if (isFavorite) {
+            updated = favs.filter(f => f.id !== item.id);
+        } else {
+            updated = [...favs, item];
+        }
+        localStorage.setItem(favKey, JSON.stringify(updated));
+        setIsFavorite(!isFavorite);
+    };
+
+    if (!item) return null;
 
     return (
         <div className="detail-screen page-enter">
             {/* Hero */}
-            <div className="detail-hero">
+            <div className="detail-hero" style={{ overflow: 'hidden' }}>
+                <div className="detail-hero-bg-blur" style={{ backgroundImage: `url(${item.hero || item.poster})` }} />
                 <img className="detail-hero-img" src={item.hero || item.poster} alt={item.title} />
                 <div className="detail-hero-gradient" />
                 <button className="detail-back-btn" onClick={onBack}><BackIcon /></button>
@@ -63,7 +82,12 @@ export default function DetailScreen({ item, onPlay, onBack }) {
                         <PlayFill />
                         {item.type === 'live' ? 'Watch Live' : 'Play Now'}
                     </button>
-                    <button className="detail-icon-btn"><PlusIcon /></button>
+                    <button
+                        className={`detail-icon-btn ${isFavorite ? 'active' : ''}`}
+                        onClick={toggleFavorite}
+                    >
+                        <HeartIcon filled={isFavorite} />
+                    </button>
                     <button className="detail-icon-btn"><ShareIcon /></button>
                 </div>
 
@@ -82,17 +106,9 @@ export default function DetailScreen({ item, onPlay, onBack }) {
                     </>
                 )}
 
-                {/* Related */}
-                <div className="detail-section-title">You May Also Like</div>
-                <div className="detail-related">
-                    {related.slice(0, 6).map(r => (
-                        <div className="related-card" key={r.id} onClick={() => { }}>
-                            <img className="related-card-img" src={r.poster} alt={r.title} loading="lazy" />
-                            <div className="related-card-title">{r.title}</div>
-                        </div>
-                    ))}
-                </div>
+                {/* Related Section Omitted for brevity or could be added back if needed */}
             </div>
         </div>
     );
 }
+

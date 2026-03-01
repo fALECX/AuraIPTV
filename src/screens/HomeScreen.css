@@ -180,7 +180,7 @@
 .home-scroll {
     flex: 1;
     overflow-y: auto;
-    padding-bottom: 100px;
+    padding-bottom: 120px;
 }
 
 .category-section {
@@ -215,6 +215,10 @@
     overflow-x: auto;
     scroll-snap-type: x mandatory;
     -webkit-overflow-scrolling: touch;
+}
+
+.category-slider::-webkit-scrollbar {
+    display: none;
 }
 
 .media-card {
@@ -298,6 +302,226 @@
     margin-top: 2px;
 }
 
+/* Category Pills (Sub-tabs) */
+.category-pills-container {
+    display: flex;
+    gap: 10px;
+    padding: 16px 20px;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    flex-shrink: 0;
+    background: rgba(8, 9, 13, 0.5);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.category-pills-container::-webkit-scrollbar {
+    display: none;
+}
+
+.category-pill {
+    padding: 8px 18px;
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: inherit;
+}
+
+.category-pill.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
+}
+
+/* Settings View */
+.settings-view {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 20px 120px;
+}
+
+.settings-header {
+    margin-top: 20px;
+    margin-bottom: 30px;
+}
+
+.settings-header h2 {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+}
+
+.settings-group {
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 24px;
+}
+
+.settings-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px;
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    margin-bottom: 12px;
+    transition: var(--transition);
+    cursor: pointer;
+}
+
+.settings-group .settings-item {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    margin-bottom: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    /* very subtle inner border */
+}
+
+.settings-group .settings-item:last-child {
+    border-bottom: none;
+}
+
+.settings-item:active {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.settings-item-label {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.settings-item-value {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    word-break: break-all;
+    max-width: 60%;
+    text-align: right;
+}
+
+/* Search Overlay */
+.search-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--bg-base);
+    z-index: 200;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.3s ease;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(20px);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.search-input-wrapper {
+    padding: 60px 20px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    background: var(--bg-base);
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.search-field-container {
+    flex: 1;
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.search-input-field {
+    width: 100%;
+    height: 50px;
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    padding: 0 16px 0 46px;
+    font-size: 16px;
+    color: #fff;
+    outline: none;
+    transition: var(--transition);
+}
+
+.search-input-field:focus {
+    border-color: var(--accent);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.search-icon-inside {
+    position: absolute;
+    left: 16px;
+    color: var(--text-secondary);
+    display: flex;
+}
+
+.search-close-btn {
+    width: 50px;
+    height: 50px;
+    background: var(--bg-surface);
+    border: 1px solid var(--glass-border);
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-primary);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.search-results {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 16px 12px;
+    align-content: start;
+    padding-bottom: 100px;
+}
+
+.search-results .media-card {
+    width: 100%;
+    scroll-snap-align: none;
+}
+
+.search-results .media-card-img-wrap {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+}
+
+.no-results {
+    padding: 60px 20px;
+    text-align: center;
+    color: var(--text-secondary);
+    grid-column: 1 / -1;
+    font-size: 14px;
+}
+
 /* Bottom Navigation */
 .bottom-nav {
     position: fixed;
@@ -309,9 +533,8 @@
     align-items: center;
     justify-content: space-around;
     padding: 12px 20px 28px;
-    background: rgba(8, 9, 13, 0.7);
-    backdrop-filter: var(--blur-lg);
-    -webkit-backdrop-filter: var(--blur-lg);
+    background: rgba(18, 20, 26, 0.95);
+    backdrop-filter: blur(20px);
     border-top: 1px solid var(--glass-border);
 }
 
@@ -342,4 +565,261 @@
 
 .nav-item.active svg {
     color: var(--accent-strong);
+}
+
+.home-loading {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Filter Bar */
+.filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px 16px;
+    background: rgba(10, 10, 12, 0.2);
+    /* Reduced from 0.4 */
+    backdrop-filter: blur(12px);
+
+    border-bottom: 1px solid var(--glass-border);
+    position: relative;
+    z-index: 10;
+}
+
+.filter-btn {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 20px;
+    padding: 8px 14px;
+    color: var(--text-primary);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+    font-family: var(--font);
+}
+
+
+.filter-btn:active {
+    transform: scale(0.97);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.filter-btn span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+    font-family: var(--font);
+}
+
+
+/* Filter Overlay (Modals) */
+.filter-overlay-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+    z-index: 1000;
+    display: flex;
+    align-items: flex-end;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+.filter-overlay-content {
+    width: 100%;
+    max-height: 80vh;
+    background: var(--bg-card);
+    border-top: 1px solid var(--glass-border);
+    border-radius: 24px 24px 0 0;
+    display: flex;
+    flex-direction: column;
+    animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.5);
+}
+
+.filter-overlay-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--glass-border);
+}
+
+.filter-overlay-header h3 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0;
+}
+
+.filter-overlay-close {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.05);
+    border: none;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.filter-overlay-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 0;
+}
+
+.filter-overlay-item {
+    padding: 16px;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    font-family: var(--font);
+    display: flex;
+
+    align-items: center;
+    justify-content: space-between;
+}
+
+.filter-overlay-item:active {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.filter-overlay-item.active {
+    color: var(--accent-strong);
+    background: rgba(99, 102, 241, 0.1);
+    border-left-color: var(--accent);
+    font-weight: 700;
+}
+
+.category-modal {
+    max-height: 70vh;
+}
+
+.sort-modal {
+    padding-bottom: 40px;
+    /* Safe area for home indicator */
+}
+
+/* Category Grid Improvements */
+.category-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px 8px;
+    padding: 16px 12px;
+    padding-bottom: 120px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.category-grid .media-card {
+    width: 100%;
+    min-width: 0;
+    /* Important: allows content to shrink and text to truncate */
+}
+
+.category-grid .media-card-img-wrap {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 2/3;
+    /* Standard movie poster ratio */
+}
+
+/* Aspect ratio for Live TV (usually square) */
+.category-grid.grid-live .media-card-img-wrap {
+    aspect-ratio: 1/1;
+}
+
+/* Ensure text truncation works in the grid */
+.category-grid .media-card-title {
+    width: 100%;
+    text-align: center;
+}
+
+/* Tab transition fixing */
+.page-enter {
+    animation: fadeInScale 0.4s ease-out;
+}
+
+@keyframes fadeInScale {
+    from {
+        opacity: 0;
+        transform: scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* Responsive Grid for wider screens */
+@media (min-width: 600px) {
+    .category-grid {
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 900px) {
+    .category-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+}
+
+@media (min-width: 1200px) {
+    .category-grid {
+        grid-template-columns: repeat(8, minmax(0, 1fr));
+    }
+}
+
+/* ─── Landscape Optimizations ───────────────────────── */
+@media (orientation: landscape) and (max-height: 500px) {
+    .home-topbar {
+        padding-top: 24px;
+    }
+
+    .home-greeting {
+        padding-top: 10px;
+    }
+
+    .home-greeting h2 {
+        font-size: 22px;
+    }
+
+    .featured-hero {
+        height: 140px;
+        margin-top: 12px;
+    }
+
+    .category-grid {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px 8px;
+        padding-bottom: 80px;
+    }
+
+    .home-scroll {
+        padding-bottom: 80px;
+    }
 }
