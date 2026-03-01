@@ -1,0 +1,172 @@
+/* ─── Setup (Login) Screen ────────────────────────────── */
+.setup-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 32px 24px 48px;
+    position: relative;
+    z-index: 1;
+    height: 100%;
+    overflow-y: auto;
+}
+
+/* Logo mark */
+.setup-logo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 36px;
+}
+
+.setup-logo-mark {
+    width: 64px;
+    height: 64px;
+    background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 32px rgba(79, 125, 255, 0.45);
+}
+
+.setup-logo-mark svg {
+    width: 32px;
+    height: 32px;
+}
+
+.setup-logo-name {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.6) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.setup-logo-tagline {
+    font-size: 13px;
+    color: var(--text-tertiary);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* Glass card */
+.setup-card {
+    width: 100%;
+    max-width: 420px;
+    border-radius: var(--radius-xl);
+    padding: 32px 28px;
+}
+
+.setup-card-heading {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.setup-card-subheading {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+    font-weight: 400;
+}
+
+/* Input group */
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    margin-bottom: 28px;
+}
+
+.input-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    padding: 14px 16px;
+    transition: var(--transition);
+}
+
+.input-wrapper:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79, 125, 255, 0.15);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.input-icon {
+    color: var(--text-tertiary);
+    flex-shrink: 0;
+}
+
+.input-field {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    font-family: var(--font);
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--text-primary);
+}
+
+.input-field::placeholder {
+    color: var(--text-tertiary);
+}
+
+/* Labels */
+.input-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-tertiary);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+}
+
+.labeled-input {
+    display: flex;
+    flex-direction: column;
+}
+
+/* Divider */
+.setup-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0 0 20px;
+}
+
+.setup-divider::before,
+.setup-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--glass-border);
+}
+
+.setup-divider span {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.setup-footer {
+    margin-top: 24px;
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.setup-footer a {
+    color: var(--accent-strong);
+    text-decoration: none;
+    font-weight: 600;
+}

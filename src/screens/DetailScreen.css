@@ -1,0 +1,223 @@
+/* ─── Detail Screen ──────────────────────────────────── */
+.detail-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+    position: relative;
+    z-index: 1;
+}
+
+/* Hero */
+.detail-hero {
+    position: relative;
+    width: 100%;
+    height: 340px;
+    flex-shrink: 0;
+}
+
+.detail-hero-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
+}
+
+.detail-hero-gradient {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to bottom, rgba(8, 9, 13, 0.15) 0%, rgba(8, 9, 13, 0.5) 50%, var(--bg-base) 100%);
+}
+
+.detail-back-btn {
+    position: absolute;
+    top: 52px;
+    left: 20px;
+    width: 38px;
+    height: 38px;
+    background: rgba(8, 9, 13, 0.55);
+    backdrop-filter: var(--blur-sm);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-primary);
+}
+
+.detail-badge {
+    position: absolute;
+    top: 52px;
+    right: 20px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(8, 9, 13, 0.55);
+    backdrop-filter: var(--blur-sm);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fbbf24;
+}
+
+/* Content */
+.detail-content {
+    padding: 0 20px 100px;
+    flex: 1;
+    margin-top: -20px;
+}
+
+.detail-genre-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
+}
+
+.detail-genre-tag {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent-strong);
+    background: rgba(79, 125, 255, 0.12);
+    border: 1px solid rgba(79, 125, 255, 0.25);
+    border-radius: 20px;
+    padding: 3px 10px;
+}
+
+.detail-dot {
+    color: var(--text-tertiary);
+    font-size: 12px;
+}
+
+.detail-meta-text {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.detail-title {
+    font-size: 28px;
+    font-weight: 800;
+    letter-spacing: -0.6px;
+    line-height: 1.15;
+    margin-bottom: 14px;
+}
+
+.detail-desc {
+    font-size: 14px;
+    color: var(--text-secondary);
+    line-height: 1.65;
+    margin-bottom: 24px;
+}
+
+/* Actions */
+.detail-actions {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 28px;
+}
+
+.detail-actions .btn-primary {
+    flex: 1;
+}
+
+.detail-icon-btn {
+    width: 52px;
+    height: 52px;
+    background: var(--bg-card);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-secondary);
+    backdrop-filter: var(--blur-sm);
+    transition: var(--transition);
+    flex-shrink: 0;
+}
+
+.detail-icon-btn:active {
+    opacity: 0.7;
+    transform: scale(0.94);
+}
+
+/* Related */
+.detail-section-title {
+    font-size: 16px;
+    font-weight: 700;
+    margin-bottom: 14px;
+}
+
+.detail-related {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.related-card {
+    flex-shrink: 0;
+    width: 110px;
+    cursor: pointer;
+}
+
+.related-card-img {
+    width: 110px;
+    height: 110px;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+    border: 1px solid var(--glass-border);
+}
+
+.related-card-title {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-top: 7px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Cast pills */
+.detail-cast {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin-bottom: 28px;
+}
+
+.cast-pill {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-card);
+    border: 1px solid var(--glass-border);
+    border-radius: 20px;
+    padding: 6px 14px 6px 6px;
+    backdrop-filter: var(--blur-sm);
+}
+
+.cast-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    background: var(--bg-surface);
+}
+
+.cast-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    white-space: nowrap;
+}
