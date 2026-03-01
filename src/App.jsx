@@ -8,6 +8,7 @@ import './index.css';
 export default function App() {
   const [screen, setScreen] = useState('setup'); // 'setup' | 'home' | 'detail' | 'player'
   const [selectedItem, setSelectedItem] = useState(null);
+  const [playingItem, setPlayingItem] = useState(null);
   const [credentials, setCredentials] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]); // Persistent across navigation
@@ -22,14 +23,20 @@ export default function App() {
     setScreen('detail');
   };
 
-  const goPlayer = (item) => {
+  const goPlayer = (item, parentItem = null) => {
     if (item) {
-      setSelectedItem(item);
+      setPlayingItem(item);
+      // Only change selected item if we are not already in detail view (to preserve context)
+      if (screen !== 'detail') {
+        setSelectedItem(item);
+      }
       // Save to watch history
+      // For series episodes, we want to store the SERIES in history, not the episode
+      const historyItem = parentItem || item;
       const histKey = credentials ? `aura_hist_${credentials.username}` : 'aura_hist_guest';
       let hist = JSON.parse(localStorage.getItem(histKey) || '[]');
-      hist = hist.filter(h => h.id !== item.id);
-      hist.unshift(item);
+      hist = hist.filter(h => h.id !== historyItem.id);
+      hist.unshift(historyItem);
       if (hist.length > 20) hist = hist.slice(0, 20);
       localStorage.setItem(histKey, JSON.stringify(hist));
     }
@@ -87,7 +94,7 @@ export default function App() {
       )}
       {screen === 'player' && (
         <PlayerScreen
-          item={selectedItem}
+          item={playingItem}
           onBack={goBack}
           key="player"
         />

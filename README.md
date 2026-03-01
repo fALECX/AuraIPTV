@@ -1,16 +1,91 @@
-# React + Vite
+# Aura: Open Source IPTV Client for Android & iOS (Xtream Codes API)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+![Aura IPTV Mockup](C:\Users\samue\.gemini\antigravity\brain\9b5863d4-bb78-47eb-8f2c-e51a2930a749\aura_iptv_mockup_png_1772399569036.png)
 
-Currently, two official plugins are available:
+Aura is a modern, premium, and open-source IPTV player built with React 19, Vite, and Capacitor. It features a stunning glassmorphic design and provides a high-end streaming experience for Android and iOS users, specifically optimized for Xtream Codes API providers.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## ✨ Features
 
-## React Compiler
+- **Glassmorphism UI**: Beautifully designed interface with vibrant colors and blur effects.
+- **Xtream Codes API Support**: Full support for **Live TV**, **VOD**, and **Series** from any Xtream-compatible provider.
+- **Cross-Platform**: Designed for mobile (**Android & iOS**) using Capacitor, but also works perfectly as a web app.
+- **Smart Category Management**: Effortlessly filter and browse through large IPTV playlists.
+- **Persistent Caching**: Optimized with Stale-While-Revalidate caching for lightning-fast loading of categories and streams.
+- **Account Profiles**: Securely save multiple IPTV provider accounts locally.
+- **Demo Mode**: Try the app instantly with built-in demo content.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🚀 Getting Started
 
-## Expanding the ESLint configuration
+### Prerequisites
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- Node.js (v18 or later)
+- npm or pnpm
+- Android Studio (for Android builds)
+- Xcode (for iOS builds - macOS only)
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/Aura-IPTV.git
+   cd Aura-IPTV
+   ```
+
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+3. Configure environment variables (optional):
+   Create a `.env` file in the root directory:
+   ```env
+   VITE_XTREAM_URL=your_provider_url
+   VITE_XTREAM_USER=your_username
+   VITE_XTREAM_PASS=your_password
+   ```
+
+### Development
+
+Run the web version in development mode:
+```bash
+npm run dev
+```
+
+### Mobile Deployment (Capacitor)
+
+1. Build the web app:
+   ```bash
+   npm run build
+   ```
+
+2. Sync with mobile platforms:
+   ```bash
+   npx cap sync
+   ```
+
+3. Open in IDEs to run on devices/emulators:
+   ```bash
+   npx cap open android
+   npx cap open ios
+   ```
+
+## 🛠️ Tech Stack
+
+- **Frontend**: [React 19](https://react.dev/), [Vite](https://vitejs.dev/)
+- **Routing**: [React Router](https://reactrouter.com/)
+- **Mobile Foundation**: [Capacitor](https://capacitorjs.com/)
+- **Styling**: Vanilla CSS (Custom Design System)
+- **Icons**: Custom SVG Icons
+
+## 🏷️ Recommended GitHub Topics
+
+To help others find this project, we recommend adding the following topics to your GitHub repository:
+`iptv` `iptv-player` `xtream-codes` `android-iptv` `ios-iptv` `react` `capacitor` `glassmorphism` `open-source` `streaming-app`
+
+## 🛡️ License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+Built with ❤️ for the open-source community.

@@ -7,6 +7,58 @@ const parseUrl = (baseUrl) => {
     }
 };
 
+// Simple IndexedDB wrapper for large data storage
+class CacheDB {
+    constructor() {
+        this.dbName = 'AuraIPTVCache';
+        this.storeName = 'api_cache';
+    }
+
+    async _getDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(this.dbName, 1);
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => resolve(request.result);
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(this.storeName)) {
+                    db.createObjectStore(this.storeName);
+                }
+            };
+        });
+    }
+
+    async get(key) {
+        try {
+            const db = await this._getDB();
+            return new Promise((resolve) => {
+                const transaction = db.transaction(this.storeName, 'readonly');
+                const request = transaction.objectStore(this.storeName).get(key);
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => resolve(null);
+            });
+        } catch (e) { return null; }
+    }
+
+    async set(key, value) {
+        try {
+            const db = await this._getDB();
+            const transaction = db.transaction(this.storeName, 'readwrite');
+            transaction.objectStore(this.storeName).put(value, key);
+        } catch (e) { console.error('Cache set error:', e); }
+    }
+
+    async clear() {
+        try {
+            const db = await this._getDB();
+            const transaction = db.transaction(this.storeName, 'readwrite');
+            transaction.objectStore(this.storeName).clear();
+        } catch (e) { }
+    }
+}
+
+const cacheDB = new CacheDB();
+
 class XtreamService {
     constructor() {
         this.baseUrl = '';
@@ -34,7 +86,9 @@ class XtreamService {
             if (data.user_info && data.user_info.auth === 1) {
                 this.setCredentials(url, username, password);
                 this.userInfo = data.user_info;
-                this.cache.clear(); // Clear cache when logging in
+                // Note: We don't clear persistent cache on login, 
+                // but we clear in-memory cache
+                this.cache.clear();
                 return { success: true, data };
             } else {
                 return { success: false, error: 'Invalid credentials' };
@@ -45,66 +99,110 @@ class XtreamService {
         }
     }
 
-    // Helper to make API calls with caching
-    async _fetchAction(action, extraParams = '') {
+    // Helper to make API calls with persistent caching
+    async _fetchAction(action, extraParams = '', onUpdate = null) {
         if (!this.username) throw new Error('Not authenticated');
 
-        const cacheKey = `${action}${extraParams}`;
+        const accountKey = `${this.baseUrl}_${this.username}`;
+        const cacheKey = `${accountKey}_${action}${extraParams}`;
+
+        // 1. Try In-Memory Cache (Live data or pending promise)
         if (this.cache.has(cacheKey)) {
-            return this.cache.get(cacheKey);
+            const cached = this.cache.get(cacheKey);
+            // If it's a resolved value and we have an update callback, trigger background refresh
+            if (!(cached instanceof Promise) && onUpdate) {
+                this._backgroundFetch(action, extraParams, cacheKey, onUpdate);
+            }
+            return cached;
         }
 
-        const url = `${this.baseUrl}/player_api.php?username=${this.username}&password=${this.password}&action=${action}${extraParams}`;
+        // 2. Try Persistent Cache (IndexedDB)
+        const persistentData = await cacheDB.get(cacheKey);
+        if (persistentData) {
+            // Save to memory cache so subsequent calls get it instantly
+            this.cache.set(cacheKey, persistentData);
 
-        const fetchPromise = fetch(url).then(async response => {
-            if (!response.ok) throw new Error(`API failed for ${action}`);
-            const data = await response.json();
-            return data;
-        }).catch(error => {
-            this.cache.delete(cacheKey); // clear failed promises from cache
-            throw error;
-        });
+            // Background fetch to refresh the data
+            if (onUpdate) {
+                this._backgroundFetch(action, extraParams, cacheKey, onUpdate);
+            } else {
+                // Even without onUpdate, we refresh it silently
+                this._backgroundFetch(action, extraParams, cacheKey, null);
+            }
+            return persistentData;
+        }
 
+        // 3. Normal Fetch (First time)
+        const fetchPromise = this._executeFetch(action, extraParams, cacheKey);
         this.cache.set(cacheKey, fetchPromise);
         return fetchPromise;
     }
 
+    async _executeFetch(action, extraParams, cacheKey) {
+        const url = `${this.baseUrl}/player_api.php?username=${this.username}&password=${this.password}&action=${action}${extraParams}`;
+
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`API failed for ${action}`);
+            const data = await response.json();
+
+            // Save to persistent cache
+            cacheDB.set(cacheKey, data);
+
+            // Save to memory cache as resolved data
+            this.cache.set(cacheKey, data);
+            return data;
+        } catch (error) {
+            this.cache.delete(cacheKey);
+            throw error;
+        }
+    }
+
+    async _backgroundFetch(action, extraParams, cacheKey, onUpdate) {
+        try {
+            const data = await this._executeFetch(action, extraParams, cacheKey);
+            if (onUpdate) onUpdate(data);
+        } catch (e) {
+            console.warn('Background refresh failed:', action);
+        }
+    }
+
     // Categories
-    async getLiveCategories() {
-        return await this._fetchAction('get_live_categories');
+    async getLiveCategories(onUpdate = null) {
+        return await this._fetchAction('get_live_categories', '', onUpdate);
     }
 
-    async getVodCategories() {
-        return await this._fetchAction('get_vod_categories');
+    async getVodCategories(onUpdate = null) {
+        return await this._fetchAction('get_vod_categories', '', onUpdate);
     }
 
-    async getSeriesCategories() {
-        return await this._fetchAction('get_series_categories');
+    async getSeriesCategories(onUpdate = null) {
+        return await this._fetchAction('get_series_categories', '', onUpdate);
     }
 
     // Streams list
-    async getLiveStreams(categoryId = null) {
+    async getLiveStreams(categoryId = null, onUpdate = null) {
         const params = categoryId ? `&category_id=${categoryId}` : '';
-        return await this._fetchAction('get_live_streams', params);
+        return await this._fetchAction('get_live_streams', params, onUpdate);
     }
 
-    async getVodStreams(categoryId = null) {
+    async getVodStreams(categoryId = null, onUpdate = null) {
         const params = categoryId ? `&category_id=${categoryId}` : '';
-        return await this._fetchAction('get_vod_streams', params);
+        return await this._fetchAction('get_vod_streams', params, onUpdate);
     }
 
-    async getSeries(categoryId = null) {
+    async getSeries(categoryId = null, onUpdate = null) {
         const params = categoryId ? `&category_id=${categoryId}` : '';
-        return await this._fetchAction('get_series', params);
+        return await this._fetchAction('get_series', params, onUpdate);
     }
 
     // Individual info
-    async getVodInfo(vodId) {
-        return await this._fetchAction('get_vod_info', `&vod_id=${vodId}`);
+    async getVodInfo(vodId, onUpdate = null) {
+        return await this._fetchAction('get_vod_info', `&vod_id=${vodId}`, onUpdate);
     }
 
-    async getSeriesInfo(seriesId) {
-        return await this._fetchAction('get_series_info', `&series_id=${seriesId}`);
+    async getSeriesInfo(seriesId, onUpdate = null) {
+        return await this._fetchAction('get_series_info', `&series_id=${seriesId}`, onUpdate);
     }
 
     // Stream URLs Builder

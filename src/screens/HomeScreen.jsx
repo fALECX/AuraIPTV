@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { FEATURED, MOCK_CATEGORIES } from '../data/mockData';
+import './Skeleton.css';
 import { xtreamApi } from '../services/xtream';
 import './HomeScreen.css';
 
@@ -141,29 +142,32 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
         const savedHist = JSON.parse(localStorage.getItem(histKey) || '[]');
         setHistory(savedHist);
 
+        const updateState = (live, vods, series) => {
+            if (!mounted) return;
+            const liveArr = Array.isArray(live) ? live : [];
+            const vodArr = Array.isArray(vods) ? vods : [];
+            const seriesArr = Array.isArray(series) ? series : [];
+
+            rawData.current = { live: liveArr, vod: vodArr, series: seriesArr };
+
+            const homeCats = [];
+            if (liveArr.length > 0) homeCats.push({ id: 'live', title: 'Top Live Channels', items: liveArr.slice(0, 30).map(mapLive) });
+            if (vodArr.length > 0) homeCats.push({ id: 'movies', title: 'Top Movies', items: vodArr.slice(0, 30).map(mapVod) });
+            if (seriesArr.length > 0) homeCats.push({ id: 'series', title: 'Top Series', items: seriesArr.slice(0, 30).map(mapSeries) });
+
+            if (homeCats.length > 0) setCategories(homeCats);
+            setLoading(false);
+        };
+
         const loadHome = async () => {
             try {
                 const [live, vods, series] = await Promise.all([
-                    xtreamApi.getLiveStreams().catch(() => []),
-                    xtreamApi.getVodStreams().catch(() => []),
-                    xtreamApi.getSeries().catch(() => [])
+                    xtreamApi.getLiveStreams(null, (newData) => updateState(newData, rawData.current.vod, rawData.current.series)),
+                    xtreamApi.getVodStreams(null, (newData) => updateState(rawData.current.live, newData, rawData.current.series)),
+                    xtreamApi.getSeries(null, (newData) => updateState(rawData.current.live, rawData.current.vod, newData))
                 ]);
 
-                if (!mounted) return;
-
-                const liveArr = Array.isArray(live) ? live : [];
-                const vodArr = Array.isArray(vods) ? vods : [];
-                const seriesArr = Array.isArray(series) ? series : [];
-
-                rawData.current = { live: liveArr, vod: vodArr, series: seriesArr };
-
-                const homeCats = [];
-                if (liveArr.length > 0) homeCats.push({ id: 'live', title: 'Top Live Channels', items: liveArr.slice(0, 30).map(mapLive) });
-                if (vodArr.length > 0) homeCats.push({ id: 'movies', title: 'Top Movies', items: vodArr.slice(0, 30).map(mapVod) });
-                if (seriesArr.length > 0) homeCats.push({ id: 'series', title: 'Top Series', items: seriesArr.slice(0, 30).map(mapSeries) });
-
-                setCategories(homeCats.length > 0 ? homeCats : MOCK_CATEGORIES);
-                setLoading(false);
+                updateState(live, vods, series);
             } catch (err) {
                 console.error(err);
                 if (mounted) {
@@ -180,6 +184,26 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
     useEffect(() => {
         if (activeTab === 'home' || activeTab === 'settings') return;
 
+        const updateCats = (cats, rawList) => {
+            if (!Array.isArray(rawList)) rawList = [];
+            const counts = {};
+            rawList.forEach(item => {
+                if (item.category_id) counts[item.category_id] = (counts[item.category_id] || 0) + 1;
+            });
+            const categoriesWithCounts = cats.map(c => ({
+                ...c,
+                count: counts[c.category_id] || 0
+            }));
+            setStreamCategories([
+                { category_id: 'all', category_name: 'All', count: rawList.length },
+                ...categoriesWithCounts
+            ]);
+            const initial = activeTab === 'live' ? rawList.slice(0, 50).map(mapLive)
+                : activeTab === 'movies' ? rawList.slice(0, 50).map(mapVod)
+                    : rawList.slice(0, 50).map(mapSeries);
+            setStreams(initial);
+        };
+
         const loadCategories = async () => {
             setLoading(true);
             try {
@@ -187,42 +211,21 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                 let rawList = [];
                 if (activeTab === 'live') {
                     [cats, rawList] = await Promise.all([
-                        xtreamApi.getLiveCategories(),
-                        xtreamApi.getLiveStreams()
+                        xtreamApi.getLiveCategories((newData) => updateCats(newData, rawList)),
+                        xtreamApi.getLiveStreams(null, (newData) => updateCats(cats, newData))
                     ]);
                 } else if (activeTab === 'movies') {
                     [cats, rawList] = await Promise.all([
-                        xtreamApi.getVodCategories(),
-                        xtreamApi.getVodStreams()
+                        xtreamApi.getVodCategories((newData) => updateCats(newData, rawList)),
+                        xtreamApi.getVodStreams(null, (newData) => updateCats(cats, newData))
                     ]);
                 } else if (activeTab === 'series') {
                     [cats, rawList] = await Promise.all([
-                        xtreamApi.getSeriesCategories(),
-                        xtreamApi.getSeries()
+                        xtreamApi.getSeriesCategories((newData) => updateCats(newData, rawList)),
+                        xtreamApi.getSeries(null, (newData) => updateCats(cats, newData))
                     ]);
                 }
-
-                if (!Array.isArray(rawList)) rawList = [];
-
-                const counts = {};
-                rawList.forEach(item => {
-                    if (item.category_id) counts[item.category_id] = (counts[item.category_id] || 0) + 1;
-                });
-
-                const categoriesWithCounts = cats.map(c => ({
-                    ...c,
-                    count: counts[c.category_id] || 0
-                }));
-
-                setStreamCategories([
-                    { category_id: 'all', category_name: 'All', count: rawList.length },
-                    ...categoriesWithCounts
-                ]);
-
-                const initial = activeTab === 'live' ? rawList.slice(0, 50).map(mapLive)
-                    : activeTab === 'movies' ? rawList.slice(0, 50).map(mapVod)
-                        : rawList.slice(0, 50).map(mapSeries);
-                setStreams(initial);
+                updateCats(cats, rawList);
                 setLoading(false);
             } catch (e) {
                 console.error(e);
@@ -383,8 +386,19 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                     )}
 
                     {loading ? (
-                        <div className="home-loading">
-                            <span className="spinner" style={{ width: 32, height: 32 }}></span>
+                        <div className="home-scroll" style={{ overflow: 'hidden' }}>
+                            <div className="category-section">
+                                <div className="skeleton skeleton-title" />
+                                <div className="category-slider">
+                                    {[1, 2, 3, 4].map(i => <div key={i} className="skeleton skeleton-card" />)}
+                                </div>
+                            </div>
+                            <div className="category-section">
+                                <div className="skeleton skeleton-title" />
+                                <div className="category-slider">
+                                    {[1, 2, 3, 4].map(i => <div key={i} className="skeleton skeleton-card" />)}
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <div className="home-scroll">
@@ -506,7 +520,11 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                 </div>
                             ) : (
                                 <div className={`category-grid grid-${activeTab}`}>
-                                    {sortedStreams.length > 0 ? (
+                                    {loading ? (
+                                        Array.from({ length: 12 }).map((_, i) => (
+                                            <div key={i} className="skeleton skeleton-card" style={{ width: '100%', height: 'auto', aspectRatio: '2/3' }} />
+                                        ))
+                                    ) : sortedStreams.length > 0 ? (
                                         sortedStreams.map(item => (
                                             <MediaCard key={item.id} item={item} onSelect={onSelectItem} />
                                         ))

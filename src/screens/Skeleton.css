@@ -1,0 +1,146 @@
+.season-selector {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 12px 20px;
+    margin: 0 -20px;
+    scrollbar-width: none;
+}
+
+.season-selector::-webkit-scrollbar {
+    display: none;
+}
+
+.season-pill {
+    padding: 8px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 14px;
+    font-weight: 500;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.season-pill.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.episodes-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 16px;
+}
+
+.episode-card {
+    display: flex;
+    gap: 16px;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 16px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.episode-card:active {
+    transform: scale(0.98);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.episode-thumb-wrap {
+    position: relative;
+    width: 120px;
+    height: 68px;
+    border-radius: 8px;
+    overflow: hidden;
+    flex-shrink: 0;
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.episode-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.episode-play-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.episode-card:hover .episode-play-overlay {
+    opacity: 1;
+}
+
+.episode-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    flex: 1;
+}
+
+.episode-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: white;
+    margin-bottom: 4px;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.episode-meta {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+/* Skeleton Loaders */
+.skeleton {
+    background: linear-gradient(90deg,
+            rgba(255, 255, 255, 0.05) 25%,
+            rgba(255, 255, 255, 0.1) 50%,
+            rgba(255, 255, 255, 0.05) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    border-radius: 12px;
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+.skeleton-card {
+    width: 140px;
+    height: 200px;
+    flex-shrink: 0;
+}
+
+.skeleton-title {
+    height: 24px;
+    width: 60%;
+    margin-bottom: 12px;
+}
