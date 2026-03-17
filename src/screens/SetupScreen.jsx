@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import './SetupScreen.css';
 import { xtreamApi } from '../services/xtream';
+import { toast } from '../components/Toast';
+import { getStoredProfiles, addProfile, deleteProfile as removeProfile, getDecryptedProfile, migrateToEncrypted } from '../utils/storage';
 
 const GlobeIcon = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -38,37 +40,38 @@ export default function SetupScreen({ onConnect }) {
     // Profiles state
     const [profiles, setProfiles] = useState([]);
 
+    // Load profiles with migration on startup
     useEffect(() => {
-        const stored = localStorage.getItem('aura_profiles');
-        if (stored) {
-            try {
-                setProfiles(JSON.parse(stored));
-            } catch (e) {
-                console.error("Failed to parse profiles", e);
-            }
-        }
+        const loadProfiles = async () => {
+            await migrateToEncrypted(); // Migrate if needed
+            const stored = await getStoredProfiles();
+            setProfiles(stored);
+        };
+        loadProfiles();
     }, []);
 
-    const saveProfile = (newCreds) => {
+    const saveProfile = async (newCreds) => {
         const existing = profiles.find(p => p.url === newCreds.url && p.username === newCreds.username);
         if (existing) return;
 
-        const updated = [...profiles, { ...newCreds, name: newCreds.username || 'Account' }];
+        await addProfile(newCreds);
+        const updated = await getStoredProfiles();
         setProfiles(updated);
-        localStorage.setItem('aura_profiles', JSON.stringify(updated));
     };
 
-    const deleteProfile = (e, index) => {
+    const deleteProfile = async (e, index) => {
         e.stopPropagation();
-        const updated = profiles.filter((_, i) => i !== index);
+        await removeProfile(index);
+        const updated = await getStoredProfiles();
         setProfiles(updated);
-        localStorage.setItem('aura_profiles', JSON.stringify(updated));
     };
 
-    const selectProfile = (p) => {
-        setUrl(p.url);
-        setUsername(p.username);
-        setPassword(p.password);
+    const selectProfile = async (p) => {
+        // Decrypt the profile to get the password
+        const decrypted = await getDecryptedProfile(p);
+        setUrl(decrypted.url);
+        setUsername(decrypted.username);
+        setPassword(decrypted.password || '');
     };
 
     const handleConnect = async (e) => {
@@ -83,10 +86,10 @@ export default function SetupScreen({ onConnect }) {
                 saveProfile(creds);
                 onConnect(creds);
             } else {
-                alert(res.error || 'Connection Failed');
+                toast.error(res.error || 'Connection Failed');
             }
         } catch (err) {
-            alert('Error connecting to provider');
+            toast.error('Error connecting to provider');
         } finally {
             setLoading(false);
         }
@@ -205,10 +208,23 @@ export default function SetupScreen({ onConnect }) {
                     Try with Demo Content
                 </button>
 
-                <p className="setup-footer">
-                    Your data is stored <strong>locally</strong> and never shared.
-                </p>
+                <div className="setup-footer">
+                    <p>Your data is stored <strong>locally</strong> and never shared.</p>
+                </div>
             </form>
+
+            <div className="setup-disclaimer glass-light">
+                <p>
+                    <strong>Legal Disclaimer:</strong> Aura is a technical media player and does not provide, host, or broadcast any content.
+                    Users are responsible for providing their own media through third-party services.
+                    Aura does not endorse or promote the streaming of copyrighted material without permission.
+                </p>
+                <div className="setup-legal-links">
+                    <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                    <span className="dot">•</span>
+                    <span>Version 1.0.0</span>
+                </div>
+            </div>
         </div>
     );
 }

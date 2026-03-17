@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import SetupScreen from './screens/SetupScreen';
 import HomeScreen from './screens/HomeScreen';
 import PlayerScreen from './screens/PlayerScreen';
 import DetailScreen from './screens/DetailScreen';
+import { ToastContainer } from './components/Toast';
+import ErrorBoundary from './components/ErrorBoundary';
+import MiniPlayer from './components/MiniPlayer';
 import './index.css';
 
 export default function App() {
@@ -12,6 +15,17 @@ export default function App() {
   const [credentials, setCredentials] = useState(null);
   const [activeTab, setActiveTab] = useState('home');
   const [selectedCategoryIds, setSelectedCategoryIds] = useState([]); // Persistent across navigation
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [playNextFn, setPlayNextFn] = useState(null);
+  const [showMiniPlayer, setShowMiniPlayer] = useState(false);
+
+  useEffect(() => {
+    const onOnline = () => setIsOnline(true);
+    const onOffline = () => setIsOnline(false);
+    window.addEventListener('online', onOnline);
+    window.addEventListener('offline', onOffline);
+    return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
+  }, []);
 
   const goHome = (creds) => {
     if (creds) setCredentials(creds);
@@ -23,15 +37,16 @@ export default function App() {
     setScreen('detail');
   };
 
-  const goPlayer = (item, parentItem = null) => {
+  const goPlayer = (item, parentItem = null, onPlayNext = null) => {
     if (item) {
       setPlayingItem(item);
+      // Store next-episode callback (wrap in function so useState doesn't call it)
+      setPlayNextFn(onPlayNext ? () => onPlayNext : null);
       // Only change selected item if we are not already in detail view (to preserve context)
       if (screen !== 'detail') {
         setSelectedItem(item);
       }
-      // Save to watch history
-      // For series episodes, we want to store the SERIES in history, not the episode
+      // Save to watch history — store the series parent, not individual episode
       const historyItem = parentItem || item;
       const histKey = credentials ? `aura_hist_${credentials.username}` : 'aura_hist_guest';
       let hist = JSON.parse(localStorage.getItem(histKey) || '[]');
@@ -44,7 +59,13 @@ export default function App() {
   };
 
   const goBack = () => {
-    if (screen === 'player') setScreen('detail');
+    if (screen === 'player') {
+      // Show mini player when going back from player
+      if (playingItem) {
+        setShowMiniPlayer(true);
+      }
+      setScreen('detail');
+    }
     else if (screen === 'detail') setScreen('home');
     else setScreen('home');
   };
@@ -59,46 +80,81 @@ export default function App() {
   };
 
   return (
-    <div className="app-shell">
-      <div className="orbs">
-        <div className="orb orb-1" />
-        <div className="orb orb-2" />
-        <div className="orb orb-3" />
+    <ErrorBoundary>
+      <div className="app-shell">
+        <div className="orbs">
+          <div className="orb orb-1" />
+          <div className="orb orb-2" />
+          <div className="orb orb-3" />
+        </div>
+
+        {/* Offline banner */}
+        {!isOnline && (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9998,
+            background: 'rgba(239,68,68,0.92)', color: '#fff',
+            textAlign: 'center', padding: '10px 16px', fontSize: '13px', fontWeight: 600,
+            backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)',
+            letterSpacing: '0.02em',
+          }}>
+            <span style={{ marginRight: 8 }}>📡</span>
+            No internet — showing cached content
+          </div>
+        )}
+
+        {screen === 'setup' && (
+          <SetupScreen onConnect={goHome} key="setup" />
+        )}
+        {screen === 'home' && (
+          <HomeScreen
+            credentials={credentials}
+            onSelectItem={goDetail}
+            onPlay={goPlayer}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            selectedCategoryIds={selectedCategoryIds}
+            setSelectedCategoryIds={setSelectedCategoryIds}
+            onLogout={handleLogout}
+            onUpdateCredentials={handleUpdateCredentials}
+            key="home"
+          />
+        )}
+        {screen === 'detail' && (
+          <DetailScreen
+            item={selectedItem}
+            onPlay={goPlayer}
+            onBack={goBack}
+            onSelectItem={goDetail}
+            credentials={credentials}
+            key="detail"
+          />
+        )}
+        {screen === 'player' && (
+          <PlayerScreen
+            item={playingItem}
+            onBack={goBack}
+            onPlayNext={playNextFn}
+            key="player"
+          />
+        )}
+        <ToastContainer />
       </div>
 
-      {screen === 'setup' && (
-        <SetupScreen onConnect={goHome} key="setup" />
-      )}
-      {screen === 'home' && (
-        <HomeScreen
-          credentials={credentials}
-          onSelectItem={goDetail}
-          onPlay={goPlayer}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          selectedCategoryIds={selectedCategoryIds}
-          setSelectedCategoryIds={setSelectedCategoryIds}
-          onLogout={handleLogout}
-          onUpdateCredentials={handleUpdateCredentials}
-          key="home"
-        />
-      )}
-      {screen === 'detail' && (
-        <DetailScreen
-          item={selectedItem}
-          onPlay={goPlayer}
-          onBack={goBack}
-          credentials={credentials}
-          key="detail"
-        />
-      )}
-      {screen === 'player' && (
-        <PlayerScreen
+      {/* Floating Mini Player */}
+      {showMiniPlayer && playingItem && (
+        <MiniPlayer
           item={playingItem}
-          onBack={goBack}
-          key="player"
+          onExpand={() => {
+            setShowMiniPlayer(false);
+            setScreen('player');
+          }}
+          onClose={() => {
+            setShowMiniPlayer(false);
+            setPlayingItem(null);
+          }}
+          onPlayNext={playNextFn}
         />
       )}
-    </div>
+    </ErrorBoundary>
   );
 }

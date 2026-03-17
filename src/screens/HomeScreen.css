@@ -266,6 +266,16 @@
     gap: 4px;
 }
 
+.media-card-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #4f7dff, #8b5cf6);
+    border-radius: 0 0 0 0;
+    transition: width 0.3s ease;
+}
+
 .live-dot {
     width: 5px;
     height: 5px;
@@ -520,6 +530,109 @@
     color: var(--text-secondary);
     grid-column: 1 / -1;
     font-size: 14px;
+}
+
+/* Search History */
+.search-history-section {
+    grid-column: 1 / -1;
+    margin-bottom: 20px;
+}
+
+.search-history-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    margin-bottom: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.search-history-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    margin-bottom: 4px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.search-history-item:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.search-history-item svg {
+    opacity: 0.5;
+}
+
+/* Empty state placeholders for Favorites / History */
+.empty-section-placeholder {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px 4px;
+    color: var(--text-tertiary);
+    font-size: 13px;
+    font-weight: 500;
+}
+
+/* Channel Number Input Modal */
+.channel-input-modal {
+    background: rgba(18, 20, 30, 0.98);
+    border: 1px solid var(--glass-border);
+    border-radius: 24px;
+    padding: 24px;
+    min-width: 280px;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.channel-input-display {
+    font-size: 48px;
+    font-weight: 800;
+    text-align: center;
+    padding: 20px;
+    color: #fff;
+    letter-spacing: 0.1em;
+}
+
+.channel-input-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.channel-input-btn {
+    aspect-ratio: 1;
+    border: none;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 24px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.channel-input-btn:active {
+    transform: scale(0.95);
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.channel-input-btn.clear {
+    background: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.channel-input-btn.go {
+    background: linear-gradient(135deg, #4f7dff, #8b5cf6);
+    font-size: 20px;
 }
 
 /* Bottom Navigation */

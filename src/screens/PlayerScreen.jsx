@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { xtreamApi } from '../services/xtream';
+import { toast } from '../components/Toast';
 import './PlayerScreen.css';
 
 const BackIcon = () => (
@@ -11,35 +12,221 @@ const PlayFill = () => <svg width="26" height="26" viewBox="0 0 24 24" fill="cur
 const PauseFill = () => <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16" /><rect x="14" y="4" width="4" height="16" /></svg>;
 const SkipBack = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="19 20 9 12 19 4 19 20" /><line x1="5" y1="19" x2="5" y2="5" /></svg>;
 const SkipFwd = () => <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 4 15 12 5 20 5 4" /><line x1="19" y1="5" x2="19" y2="19" /></svg>;
-const VolumeIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>;
-const CastIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 8.5C5.6 5.4 9.6 3.5 14 3.5s8.4 1.9 12 5" /><path d="M5 12c2.4-2 5.4-3.2 9-3.2s6.6 1.2 9 3.2" /><path d="M8 15.5C9.4 14.5 11 14 13 14s3.6.5 5 1.5" /><circle cx="13" cy="19" r="2" /></svg>;
+const VolumeIcon = ({ muted }) => muted
+    ? <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><line x1="23" y1="9" x2="17" y2="15" /><line x1="17" y1="9" x2="23" y2="15" /></svg>
+    : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" /><path d="M19.07 4.93a10 10 0 0 1 0 14.14" /><path d="M15.54 8.46a5 5 0 0 1 0 7.07" /></svg>;
+const PipIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" /><rect x="12" y="12" width="8" height="6" rx="1" fill="currentColor" stroke="none" /></svg>;
 const FullscreenIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 3 21 3 21 9" /><polyline points="9 21 3 21 3 15" /><line x1="21" y1="3" x2="14" y2="10" /><line x1="3" y1="21" x2="10" y2="14" /></svg>;
+const ExitFullscreenIcon = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="4 14 10 14 10 20" /><polyline points="20 10 14 10 14 4" /><line x1="10" y1="14" x2="3" y2="21" /><line x1="21" y1="3" x2="14" y2="10" /></svg>;
+const SleepIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
+const ScreenIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" /></svg>;
+const MusicIcon = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></svg>;
 
 function formatTime(s) {
-    if (isNaN(s)) return "00:00";
-    const m = Math.floor(s / 60).toString().padStart(2, '0');
+    if (isNaN(s) || s < 0) return '00:00';
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60).toString().padStart(2, '0');
     const ss = Math.floor(s % 60).toString().padStart(2, '0');
-    return `${m}:${ss}`;
+    return h > 0 ? `${h}:${m}:${ss}` : `${m}:${ss}`;
 }
 
-export default function PlayerScreen({ item, onBack }) {
+const POSITION_KEY = (item) => item ? `aura_pos_${item.id}` : null;
+
+export default function PlayerScreen({ item, onBack, onPlayNext }) {
     const [playing, setPlaying] = useState(true);
     const [progress, setProgress] = useState(0);
     const [showControls, setShowControls] = useState(true);
     const [duration, setDuration] = useState(0);
-    const [playbackSpeed, setPlaybackSpeed] = useState(1);
+    const [playbackSpeed, setPlaybackSpeed] = useState(() => {
+        try {
+            const settings = JSON.parse(localStorage.getItem('aura_player_settings') || '{}');
+            return settings.playbackSpeed || 1;
+        } catch { return 1; }
+    });
     const [streamError, setStreamError] = useState(false);
-    const [transcodeFallback, setTranscodeFallback] = useState(false);
+    const [transcodeFallback, setTranscodeFallback] = useState(() => {
+        try {
+            const settings = JSON.parse(localStorage.getItem('aura_player_settings') || '{}');
+            return settings.preferredQuality === 'transcoded';
+        } catch { return false; }
+    });
     const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
+    const [volume, setVolume] = useState(1);
+    const [muted, setMuted] = useState(false);
+    const [isFullscreen, setIsFullscreen] = useState(false);
+    const [showResumePrompt, setShowResumePrompt] = useState(false);
+    const [resumePosition, setResumePosition] = useState(0);
+    const [showNextCountdown, setShowNextCountdown] = useState(false);
+    const [nextCountdown, setNextCountdown] = useState(5);
+    const [isBuffering, setIsBuffering] = useState(false);
+    const [sleepTimer, setSleepTimer] = useState(null);
+    const [sleepTimeRemaining, setSleepTimeRemaining] = useState(0);
+    const [keepScreenOn, setKeepScreenOn] = useState(() => {
+        try {
+            const settings = JSON.parse(localStorage.getItem('aura_player_settings') || '{}');
+            return settings.keepScreenOn !== false;
+        } catch { return true; }
+    });
+    const [audioMode, setAudioMode] = useState(false);
     const videoRef = useRef(null);
+    const positionSaveRef = useRef(null);
+    const sleepTimerRef = useRef(null);
+    const wakeLockRef = useRef(null);
 
     const currentExt = transcodeFallback ? 'm3u8' : (item?.extension || 'mp4');
-
     const streamUrl = item?.type === 'live'
         ? xtreamApi.getLiveStreamUrl(item.stream_id, 'm3u8')
         : item?.type === 'series'
             ? xtreamApi.getSeriesStreamUrl(item.stream_id, currentExt)
             : xtreamApi.getVodStreamUrl(item.stream_id, currentExt);
+
+    // Check for saved position and offer resume
+    useEffect(() => {
+        if (!item || item.type === 'live') return;
+        const key = POSITION_KEY(item);
+        const saved = parseFloat(localStorage.getItem(key));
+        if (saved && saved > 10) {
+            setResumePosition(saved);
+            setShowResumePrompt(true);
+        }
+    }, [item?.id]);
+
+    // Save playback position every 5 seconds
+    useEffect(() => {
+        if (!item || item.type === 'live') return;
+        positionSaveRef.current = setInterval(() => {
+            if (videoRef.current && videoRef.current.currentTime > 5) {
+                const key = POSITION_KEY(item);
+                localStorage.setItem(key, videoRef.current.currentTime.toString());
+            }
+        }, 5000);
+        return () => clearInterval(positionSaveRef.current);
+    }, [item?.id]);
+
+    // Buffering detection
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video) return;
+        const onWaiting = () => setIsBuffering(true);
+        const onPlaying = () => setIsBuffering(false);
+        video.addEventListener('waiting', onWaiting);
+        video.addEventListener('playing', onPlaying);
+        video.addEventListener('canplay', onPlaying);
+        return () => {
+            video.removeEventListener('waiting', onWaiting);
+            video.removeEventListener('playing', onPlaying);
+            video.removeEventListener('canplay', onPlaying);
+        };
+    }, []);
+
+    // Sleep timer
+    useEffect(() => {
+        if (sleepTimer === null) {
+            setSleepTimeRemaining(0);
+            return;
+        }
+
+        setSleepTimeRemaining(sleepTimer * 60);
+
+        sleepTimerRef.current = setInterval(() => {
+            setSleepTimeRemaining(prev => {
+                if (prev <= 1) {
+                    clearInterval(sleepTimerRef.current);
+                    setSleepTimer(null);
+                    if (videoRef.current) {
+                        videoRef.current.pause();
+                        setPlaying(false);
+                    }
+                    toast.info('Sleep timer: Playback stopped');
+                    return 0;
+                }
+                return prev - 1;
+            });
+        }, 1000);
+
+        return () => clearInterval(sleepTimerRef.current);
+    }, [sleepTimer]);
+
+    // Screen Wake Lock
+    useEffect(() => {
+        const requestWakeLock = async () => {
+            if (!keepScreenOn) return;
+            try {
+                if ('wakeLock' in navigator) {
+                    wakeLockRef.current = await navigator.wakeLock.request('screen');
+                }
+            } catch (err) {
+                console.warn('Wake lock not available:', err);
+            }
+        };
+
+        const releaseWakeLock = async () => {
+            if (wakeLockRef.current) {
+                try {
+                    await wakeLockRef.current.release();
+                    wakeLockRef.current = null;
+                } catch { }
+            }
+        };
+
+        requestWakeLock();
+
+        // Re-request wake lock on visibility change
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && keepScreenOn) {
+                requestWakeLock();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            releaseWakeLock();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [keepScreenOn]);
+
+    // Media Session API for lock screen controls and background playback
+    useEffect(() => {
+        if (!('mediaSession' in navigator) || !item) return;
+
+        navigator.mediaSession.metadata = new MediaMetadata({
+            title: item.title,
+            artist: item.genre || 'Aura IPTV',
+            artwork: item.poster || item.hero ? [
+                { src: item.poster || item.hero, sizes: '512x512', type: 'image/png' }
+            ] : []
+        });
+
+        navigator.mediaSession.setActionHandler('play', () => {
+            if (videoRef.current) videoRef.current.play();
+            setPlaying(true);
+        });
+
+        navigator.mediaSession.setActionHandler('pause', () => {
+            if (videoRef.current) videoRef.current.pause();
+            setPlaying(false);
+        });
+
+        navigator.mediaSession.setActionHandler('seekbackward', () => {
+            seek(-15);
+        });
+
+        navigator.mediaSession.setActionHandler('seekforward', () => {
+            seek(15);
+        });
+
+        return () => {
+            navigator.mediaSession.metadata = null;
+        };
+    }, [item]);
+
+    // Save settings when changed
+    const saveSettings = useCallback((updates) => {
+        try {
+            const current = JSON.parse(localStorage.getItem('aura_player_settings') || '{}');
+            localStorage.setItem('aura_player_settings', JSON.stringify({ ...current, ...updates }));
+        } catch { }
+    }, []);
 
     // Auto-hide controls after 4s of no interaction
     useEffect(() => {
@@ -48,11 +235,9 @@ export default function PlayerScreen({ item, onBack }) {
         return () => clearTimeout(t);
     }, [showControls, lastInteractionTime]);
 
-    // Force controls visibility on orientation change to fix "unresponsive tap" bug
+    // Orientation / resize
     useEffect(() => {
-        const handleResize = () => {
-            setShowControls(true);
-        };
+        const handleResize = () => setShowControls(true);
         window.addEventListener('orientationchange', handleResize);
         window.addEventListener('resize', handleResize);
         return () => {
@@ -61,21 +246,37 @@ export default function PlayerScreen({ item, onBack }) {
         };
     }, []);
 
-    // Handle Play / Pause
+    // Fullscreen change listener
+    useEffect(() => {
+        const onChange = () => setIsFullscreen(!!document.fullscreenElement);
+        document.addEventListener('fullscreenchange', onChange);
+        document.addEventListener('webkitfullscreenchange', onChange);
+        return () => {
+            document.removeEventListener('fullscreenchange', onChange);
+            document.removeEventListener('webkitfullscreenchange', onChange);
+        };
+    }, []);
+
+    // Play / Pause
     useEffect(() => {
         if (videoRef.current && !streamError) {
             if (playing) {
                 videoRef.current.play().catch(e => {
-                    console.warn("Autoplay prevented or playback error:", e);
-                    if (e.name === 'NotSupportedError') {
-                        setStreamError(true);
-                    }
+                    console.warn('Autoplay prevented:', e);
+                    if (e.name === 'NotSupportedError') setStreamError(true);
                 });
             } else {
                 videoRef.current.pause();
             }
         }
     }, [playing, streamError]);
+
+    // Volume sync
+    useEffect(() => {
+        if (videoRef.current) {
+            videoRef.current.volume = muted ? 0 : volume;
+        }
+    }, [volume, muted]);
 
     const handleTimeUpdate = () => {
         if (!videoRef.current) return;
@@ -87,42 +288,91 @@ export default function PlayerScreen({ item, onBack }) {
         }
     };
 
+    const handleEnded = () => {
+        setPlaying(false);
+        // Clear saved position on finish
+        if (item) localStorage.removeItem(POSITION_KEY(item));
+        // Offer auto-play next if callback provided
+        if (onPlayNext) {
+            setShowNextCountdown(true);
+            setNextCountdown(5);
+        }
+    };
+
+    // Auto-next countdown
+    useEffect(() => {
+        if (!showNextCountdown) return;
+        if (nextCountdown <= 0) {
+            setShowNextCountdown(false);
+            onPlayNext?.();
+            return;
+        }
+        const t = setTimeout(() => setNextCountdown(v => v - 1), 1000);
+        return () => clearTimeout(t);
+    }, [showNextCountdown, nextCountdown, onPlayNext]);
+
     const seek = (timeChange) => {
         if (!videoRef.current) return;
-        videoRef.current.currentTime += timeChange;
+        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime + timeChange);
     };
 
     const cycleSpeed = () => {
         const speeds = [1, 1.25, 1.5, 2];
         const nextSpeed = speeds[(speeds.indexOf(playbackSpeed) + 1) % speeds.length];
         setPlaybackSpeed(nextSpeed);
-        if (videoRef.current) {
-            videoRef.current.playbackRate = nextSpeed;
+        if (videoRef.current) videoRef.current.playbackRate = nextSpeed;
+        saveSettings({ playbackSpeed: nextSpeed });
+        toast.info(`Speed: ${nextSpeed}×`);
+    };
+
+    const toggleQuality = () => {
+        const newValue = !transcodeFallback;
+        setTranscodeFallback(newValue);
+        saveSettings({ preferredQuality: newValue ? 'transcoded' : 'original' });
+        toast.info(newValue ? 'Quality: Transcoded' : 'Quality: Original');
+    };
+
+    const cycleSleepTimer = () => {
+        const options = [null, 15, 30, 45, 60];
+        const currentIndex = options.indexOf(sleepTimer);
+        const nextIndex = (currentIndex + 1) % options.length;
+        setSleepTimer(options[nextIndex]);
+        if (options[nextIndex]) {
+            toast.info(`Sleep timer: ${options[nextIndex]} min`);
+        } else {
+            toast.info('Sleep timer: Off');
         }
+    };
+
+    const toggleWakeLock = () => {
+        setKeepScreenOn(prev => {
+            saveSettings({ keepScreenOn: !prev });
+            return !prev;
+        });
+        toast.info(keepScreenOn ? 'Screen lock: Off' : 'Screen lock: On');
+    };
+
+    const toggleAudioMode = () => {
+        setAudioMode(prev => !prev);
+        toast.info(audioMode ? 'Video mode: On' : 'Audio mode: On - minimize to listen');
     };
 
     const toggleSubtitles = () => {
         if (!videoRef.current) return;
         const tracks = videoRef.current.textTracks;
         if (!tracks || tracks.length === 0) {
-            alert("No subtitles available for this stream.");
+            toast.info('No subtitles available for this stream');
             return;
         }
-
         let anyShowing = false;
         for (let i = 0; i < tracks.length; i++) {
-            if (tracks[i].mode === 'showing') {
-                anyShowing = true;
-                tracks[i].mode = 'hidden';
-            }
+            if (tracks[i].mode === 'showing') { anyShowing = true; tracks[i].mode = 'hidden'; }
         }
-
         if (!anyShowing) {
-            // Pick the first available text track
             tracks[0].mode = 'showing';
-            alert(`Subtitles Enabled: ${tracks[0].label || tracks[0].language || 'Track 1'}`);
+            toast.success(`Subtitles: ${tracks[0].label || tracks[0].language || 'Track 1'}`);
         } else {
-            alert("Subtitles Disabled");
+            toast.info('Subtitles off');
         }
     };
 
@@ -130,34 +380,49 @@ export default function PlayerScreen({ item, onBack }) {
         if (!videoRef.current) return;
         const tracks = videoRef.current.audioTracks;
         if (!tracks || tracks.length <= 1) {
-            alert("No alternate audio tracks available for this stream.");
+            toast.info('No alternate audio tracks available');
             return;
         }
         let currentIndex = -1;
-        for (let i = 0; i < tracks.length; i++) {
-            if (tracks[i].enabled) currentIndex = i;
-        }
+        for (let i = 0; i < tracks.length; i++) { if (tracks[i].enabled) currentIndex = i; }
         const nextIndex = (currentIndex + 1) % tracks.length;
-        for (let i = 0; i < tracks.length; i++) {
-            tracks[i].enabled = (i === nextIndex);
+        for (let i = 0; i < tracks.length; i++) tracks[i].enabled = (i === nextIndex);
+        toast.success(`Audio: ${tracks[nextIndex].label || tracks[nextIndex].language || `Track ${nextIndex + 1}`}`);
+    };
+
+    const toggleFullscreen = () => {
+        const el = document.documentElement;
+        if (!document.fullscreenElement) {
+            (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el);
+        } else {
+            (document.exitFullscreen || document.webkitExitFullscreen)?.call(document);
         }
-        alert(`Audio Track: ${tracks[nextIndex].label || tracks[nextIndex].language || `Track ${nextIndex + 1}`}`);
+    };
+
+    const togglePip = async () => {
+        if (!videoRef.current) return;
+        try {
+            if (document.pictureInPictureElement) {
+                await document.exitPictureInPicture();
+            } else {
+                await videoRef.current.requestPictureInPicture();
+            }
+        } catch {
+            toast.error('Picture-in-Picture not supported on this device');
+        }
     };
 
     const tap = useCallback((e) => {
         setLastInteractionTime(Date.now());
-
-        // Prevent toggle when clicking interactables directly
         const isInteractive = e.target.closest('button') || e.target.closest('.player-progress-wrap') || e.target.closest('.player-volume-track') || e.target.closest('.player-bottom');
         if (isInteractive) return;
-
         setShowControls(v => !v);
     }, []);
 
     const currentSeconds = duration ? (progress / 100) * duration : 0;
 
     return (
-        <div className="player-screen" onClick={tap} style={{ background: '#000' }}>
+        <div className="player-screen" onClick={tap} style={{ background: audioMode ? 'transparent' : '#000' }}>
             <video
                 ref={videoRef}
                 className="player-video-bg"
@@ -165,13 +430,119 @@ export default function PlayerScreen({ item, onBack }) {
                 autoPlay
                 playsInline
                 onTimeUpdate={handleTimeUpdate}
-                onEnded={() => setPlaying(false)}
-                onError={() => {
-                    console.error("Video element triggered onError.");
-                    setStreamError(true);
+                onLoadedMetadata={() => {
+                    if (videoRef.current) {
+                        videoRef.current.volume = volume;
+                        videoRef.current.playbackRate = playbackSpeed;
+                    }
                 }}
-                style={{ width: '100%', height: '100%', objectFit: 'contain', zIndex: 0, pointerEvents: 'none', display: streamError ? 'none' : 'block' }}
+                onEnded={handleEnded}
+                onError={() => { console.error('Video error'); setStreamError(true); }}
+                style={{
+                    width: audioMode ? '1px' : '100%',
+                    height: audioMode ? '1px' : '100%',
+                    objectFit: 'contain',
+                    zIndex: 0,
+                    pointerEvents: 'none',
+                    display: streamError ? 'none' : (audioMode ? 'block' : 'block'),
+                    position: audioMode ? 'fixed' : 'relative',
+                    top: audioMode ? '-9999px' : '0'
+                }}
             />
+
+            {/* Audio Mode Background */}
+            {audioMode && (
+                <div style={{
+                    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                    background: 'linear-gradient(135deg, #1a1a2e 0%, #16213e 100%)', zIndex: 1
+                }}>
+                    <div style={{
+                        width: 120, height: 120, borderRadius: '50%',
+                        background: 'linear-gradient(135deg, #4f7dff, #8b5cf6)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        marginBottom: 24, animation: 'pulse 2s infinite'
+                    }}>
+                        <MusicIcon />
+                    </div>
+                    <div style={{ fontSize: 18, fontWeight: 600, color: '#fff', marginBottom: 8 }}>
+                        {item?.title}
+                    </div>
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.6)' }}>
+                        {item?.genre} • Audio Mode
+                    </div>
+                </div>
+            )}
+
+            {/* Buffering Indicator */}
+            {isBuffering && (
+                <div style={{
+                    position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
+                    zIndex: 15, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
+                }}>
+                    <div style={{
+                        width: 50, height: 50,
+                        border: '3px solid rgba(255,255,255,0.3)',
+                        borderTopColor: '#fff', borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                    }} />
+                    <span style={{ color: '#fff', fontSize: 14, fontWeight: 500 }}>Buffering...</span>
+                </div>
+            )}
+
+            {/* Resume prompt */}
+            {showResumePrompt && (
+                <div style={{
+                    position: 'absolute', bottom: 100, left: '50%', transform: 'translateX(-50%)',
+                    background: 'rgba(18,20,30,0.95)', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 16, padding: '16px 20px', zIndex: 20, display: 'flex',
+                    flexDirection: 'column', gap: 12, minWidth: 260, backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                }}>
+                    <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>
+                        Resume from {formatTime(resumePosition)}?
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                        <button onClick={() => {
+                            if (videoRef.current) videoRef.current.currentTime = resumePosition;
+                            setShowResumePrompt(false);
+                        }} style={{
+                            flex: 1, padding: '10px', borderRadius: 10, background: '#4f7dff',
+                            border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                        }}>Resume</button>
+                        <button onClick={() => setShowResumePrompt(false)} style={{
+                            flex: 1, padding: '10px', borderRadius: 10, background: 'rgba(255,255,255,0.1)',
+                            border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)',
+                            fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                        }}>From start</button>
+                    </div>
+                </div>
+            )}
+
+            {/* Auto-next episode overlay */}
+            {showNextCountdown && onPlayNext && (
+                <div style={{
+                    position: 'absolute', bottom: 100, right: 24,
+                    background: 'rgba(18,20,30,0.95)', border: '1px solid rgba(255,255,255,0.15)',
+                    borderRadius: 16, padding: '16px 20px', zIndex: 20, display: 'flex',
+                    flexDirection: 'column', gap: 12, maxWidth: 220, backdropFilter: 'blur(20px)',
+                    WebkitBackdropFilter: 'blur(20px)',
+                }}>
+                    <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)' }}>Next episode in</div>
+                    <div style={{ fontSize: 32, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{nextCountdown}</div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => { setShowNextCountdown(false); onPlayNext(); }} style={{
+                            flex: 1, padding: '9px', borderRadius: 10, background: '#4f7dff',
+                            border: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                        }}>Play now</button>
+                        <button onClick={() => setShowNextCountdown(false)} style={{
+                            flex: 1, padding: '9px', borderRadius: 10, background: 'rgba(255,255,255,0.08)',
+                            border: '1px solid rgba(255,255,255,0.12)', color: 'rgba(255,255,255,0.6)',
+                            fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+                        }}>Cancel</button>
+                    </div>
+                </div>
+            )}
 
             {/* Error Overlay */}
             {streamError && (
@@ -184,24 +555,12 @@ export default function PlayerScreen({ item, onBack }) {
                         This {item?.extension || 'mp4'} stream contains a codec your browser doesn't support natively (like HEVC), or the source link has expired.
                     </p>
                     <div style={{ display: 'flex', gap: '12px' }}>
-                        <button
-                            onClick={onBack}
-                            style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '10px 24px', borderRadius: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500 }}
-                        >
+                        <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '10px 24px', borderRadius: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500 }}>
                             <BackIcon /> Go Back
                         </button>
                         {!transcodeFallback && (
-                            <button
-                                onClick={() => {
-                                    setTranscodeFallback(true);
-                                    setStreamError(false);
-                                    setPlaying(true);
-                                    if (videoRef.current) {
-                                        videoRef.current.load();
-                                    }
-                                }}
-                                style={{ background: '#3b82f6', border: 'none', color: '#fff', padding: '10px 24px', borderRadius: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500 }}
-                            >
+                            <button onClick={() => { setTranscodeFallback(true); setStreamError(false); setPlaying(true); setTimeout(() => videoRef.current?.load(), 50); }}
+                                style={{ background: '#3b82f6', border: 'none', color: '#fff', padding: '10px 24px', borderRadius: '24px', cursor: 'pointer', fontSize: '14px', fontWeight: 500 }}>
                                 Try Transcoded Stream
                             </button>
                         )}
@@ -219,21 +578,19 @@ export default function PlayerScreen({ item, onBack }) {
                         <div className="player-subtitle">{item?.genre} · {item?.year}</div>
                     </div>
                     {item?.type === 'live' && <div className="player-live-chip"><span className="player-live-dot" />LIVE</div>}
-                    <button className="player-top-icon"><CastIcon /></button>
-                    <button className="player-top-icon"><FullscreenIcon /></button>
+                    <button className="player-top-icon" onClick={togglePip}><PipIcon /></button>
+                    <button className="player-top-icon" onClick={toggleFullscreen}>
+                        {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
+                    </button>
                 </div>
 
                 {/* Center play controls */}
                 <div className="player-center">
-                    <button className="player-center-btn" onClick={() => seek(-15)}>
-                        <SkipBack />
-                    </button>
+                    <button className="player-center-btn" onClick={() => seek(-15)}><SkipBack /></button>
                     <button className="player-main-play" onClick={() => setPlaying(v => !v)}>
                         {playing ? <PauseFill /> : <PlayFill />}
                     </button>
-                    <button className="player-center-btn" onClick={() => seek(15)}>
-                        <SkipFwd />
-                    </button>
+                    <button className="player-center-btn" onClick={() => seek(15)}><SkipFwd /></button>
                 </div>
 
                 {/* Bottom glass controls */}
@@ -252,9 +609,7 @@ export default function PlayerScreen({ item, onBack }) {
                                         const rect = e.currentTarget.getBoundingClientRect();
                                         const pct = ((e.clientX - rect.left) / rect.width) * 100;
                                         const newTime = (pct / 100) * duration;
-                                        if (videoRef.current) {
-                                            videoRef.current.currentTime = newTime;
-                                        }
+                                        if (videoRef.current) videoRef.current.currentTime = newTime;
                                         setProgress(Math.max(0, Math.min(100, pct)));
                                     }}
                                 >
@@ -269,25 +624,37 @@ export default function PlayerScreen({ item, onBack }) {
                         <div className="player-controls-row">
                             {/* Volume */}
                             <div className="player-volume-row">
-                                <button className="player-ctrl-btn"><VolumeIcon /></button>
-                                <div className="player-volume-track">
-                                    <div className="player-volume-fill" />
+                                <button className="player-ctrl-btn" onClick={() => setMuted(v => !v)}>
+                                    <VolumeIcon muted={muted || volume === 0} />
+                                </button>
+                                <div
+                                    className="player-volume-track"
+                                    onClick={e => {
+                                        const rect = e.currentTarget.getBoundingClientRect();
+                                        const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                                        setVolume(pct);
+                                        setMuted(false);
+                                    }}
+                                >
+                                    <div className="player-volume-fill" style={{ width: `${(muted ? 0 : volume) * 100}%` }} />
                                 </div>
                             </div>
 
                             <button className="player-ctrl-btn" onClick={cycleAudioTrack}>Audio</button>
                             <button className="player-ctrl-btn" onClick={toggleSubtitles}>CC</button>
+                            <button className="player-ctrl-btn" onClick={toggleQuality}>{transcodeFallback ? 'HD' : 'SD'}</button>
                             <button className="player-ctrl-btn" onClick={cycleSpeed}>{playbackSpeed}×</button>
-                            <button className="player-ctrl-btn" onClick={() => {
-                                if (videoRef.current) {
-                                    if (videoRef.current.requestFullscreen) {
-                                        videoRef.current.requestFullscreen();
-                                    } else if (videoRef.current.webkitRequestFullscreen) {
-                                        videoRef.current.webkitRequestFullscreen();
-                                    }
-                                }
-                            }}>
-                                <FullscreenIcon />
+                            <button className="player-ctrl-btn" onClick={cycleSleepTimer} style={{ color: sleepTimer ? '#4f7dff' : 'inherit' }}>
+                                <SleepIcon />{sleepTimer ? ` ${sleepTimeRemaining}m` : ''}
+                            </button>
+                            <button className="player-ctrl-btn" onClick={toggleWakeLock} style={{ color: keepScreenOn ? '#4f7dff' : 'inherit' }}>
+                                <ScreenIcon />
+                            </button>
+                            <button className="player-ctrl-btn" onClick={toggleAudioMode} style={{ color: audioMode ? '#4f7dff' : 'inherit' }}>
+                                <MusicIcon />
+                            </button>
+                            <button className="player-ctrl-btn" onClick={toggleFullscreen}>
+                                {isFullscreen ? <ExitFullscreenIcon /> : <FullscreenIcon />}
                             </button>
                         </div>
                     </div>

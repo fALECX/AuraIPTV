@@ -1,0 +1,84 @@
+.mini-player {
+    position: fixed;
+    width: 200px;
+    height: 120px;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    z-index: 9999;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    cursor: grab;
+    transition: box-shadow 0.2s;
+}
+
+.mini-player:active {
+    cursor: grabbing;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.6);
+}
+
+.mini-player-header {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 8px;
+    z-index: 2;
+}
+
+.mini-player-title {
+    font-size: 10px;
+    color: #fff;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 80px;
+}
+
+.mini-player-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.mini-player-btn {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    transition: background 0.15s;
+}
+
+.mini-player-btn:hover {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.mini-player-close:hover {
+    background: rgba(239, 68, 68, 0.8);
+}
+
+.mini-player-video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    cursor: pointer;
+}
+
+.mini-player-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #4f7dff, #8b5cf6);
+    cursor: pointer;
+}
