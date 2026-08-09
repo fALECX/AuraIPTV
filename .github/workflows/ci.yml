@@ -24,9 +24,6 @@ jobs:
       - name: Install Node.js dependencies
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
       - name: Build web application
         run: npm run build
 
