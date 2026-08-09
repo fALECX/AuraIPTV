@@ -19,3 +19,13 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Capacitor uses reflection to discover plugins and their @PluginMethod-annotated
+# methods at runtime; without these, R8 strips/renames them and every native
+# plugin (splash screen, filesystem, etc.) silently breaks in release builds.
+-keep class com.getcapacitor.** { *; }
+-keep @com.getcapacitor.annotation.CapacitorPlugin public class * extends com.getcapacitor.Plugin
+-keepclassmembers @com.getcapacitor.annotation.CapacitorPlugin public class * extends com.getcapacitor.Plugin {
+    @com.getcapacitor.annotation.PluginMethod public *;
+}
+-keep class com.aura.iptv.** { *; }

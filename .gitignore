@@ -12,6 +12,16 @@ dist
 dist-ssr
 *.local
 
+# Environment/secrets
+.env
+.env.*
+!.env.example
+
+# Android signing
+android/*.keystore
+android/*.jks
+android/keystore.properties
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

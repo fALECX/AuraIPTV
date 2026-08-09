@@ -1,7 +1,5 @@
 # Aura: Open Source IPTV Client for Android & iOS (Xtream Codes API)
 
-![Aura IPTV Mockup](C:\Users\samue\.gemini\antigravity\brain\9b5863d4-bb78-47eb-8f2c-e51a2930a749\aura_iptv_mockup_png_1772399569036.png)
-
 Aura is a modern, premium, and open-source IPTV player built with React 19, Vite, and Capacitor. It features a stunning glassmorphic design and provides a high-end streaming experience for Android and iOS users, specifically optimized for Xtream Codes API providers.
 
 ## ✨ Features
@@ -68,6 +66,10 @@ npm run dev
    npx cap open android
    npx cap open ios
    ```
+
+## 📦 Download
+
+Grab the latest signed `.apk` from the [Releases](../../releases) page and install it directly on Android — no Play Store needed. See [RELEASING.md](RELEASING.md) for how releases are built and published.
 
 ## 🛠️ Tech Stack
 

@@ -8,3 +8,4 @@ export { useWatchHistory } from './useWatchHistory';
 export { useDebounce } from './useDebounce';
 export { usePlayerSettings } from './usePlayerSettings';
 export { useSearchHistory } from './useSearchHistory';
+export { useHlsPlayer } from './useHlsPlayer';

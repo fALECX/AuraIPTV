@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { xtreamApi } from '../services/xtream';
+import { useHlsPlayer } from '../hooks/useHlsPlayer';
 import './MiniPlayer.css';
 
 export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
@@ -13,6 +14,8 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
     const streamUrl = item?.type === 'live'
         ? xtreamApi.getLiveStreamUrl(item.stream_id, 'm3u8')
         : xtreamApi.getVodStreamUrl(item.stream_id, item?.extension || 'mp4');
+
+    useHlsPlayer(videoRef, streamUrl);
 
     useEffect(() => {
         if (videoRef.current && playing) {
@@ -106,7 +109,6 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
 
             <video
                 ref={videoRef}
-                src={streamUrl}
                 className="mini-player-video"
                 autoPlay
                 playsInline

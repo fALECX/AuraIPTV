@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { xtreamApi } from '../services/xtream';
 import { toast } from '../components/Toast';
+import { useHlsPlayer } from '../hooks/useHlsPlayer';
 import './PlayerScreen.css';
 
 const BackIcon = () => (
@@ -79,6 +80,9 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
         : item?.type === 'series'
             ? xtreamApi.getSeriesStreamUrl(item.stream_id, currentExt)
             : xtreamApi.getVodStreamUrl(item.stream_id, currentExt);
+
+    const onHlsFatalError = useCallback(() => setStreamError(true), []);
+    useHlsPlayer(videoRef, streamUrl, { onFatalError: onHlsFatalError });
 
     // Check for saved position and offer resume
     useEffect(() => {
@@ -426,7 +430,6 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
             <video
                 ref={videoRef}
                 className="player-video-bg"
-                src={streamUrl}
                 autoPlay
                 playsInline
                 onTimeUpdate={handleTimeUpdate}

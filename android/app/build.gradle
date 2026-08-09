@@ -1,5 +1,20 @@
 apply plugin: 'com.android.application'
 
+// Release signing: read from android/keystore.properties (local, gitignored) if present,
+// otherwise fall back to environment variables (used by CI). Either way, signingConfig
+// is only wired up if all four values are actually available, so unsigned local
+// `assembleDebug` builds keep working without any of this configured.
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+def signingStoreFile = keystoreProperties.getProperty('storeFile') ?: System.getenv('ANDROID_KEYSTORE_PATH')
+def signingStorePassword = keystoreProperties.getProperty('storePassword') ?: System.getenv('ANDROID_KEYSTORE_PASSWORD')
+def signingKeyAlias = keystoreProperties.getProperty('keyAlias') ?: System.getenv('ANDROID_KEY_ALIAS')
+def signingKeyPassword = keystoreProperties.getProperty('keyPassword') ?: System.getenv('ANDROID_KEY_PASSWORD')
+def hasReleaseSigning = signingStoreFile && signingStorePassword && signingKeyAlias && signingKeyPassword
+
 android {
     namespace = "com.aura.iptv"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -7,8 +22,10 @@ android {
         applicationId "com.aura.iptv"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        // Overridable from the command line for release builds, e.g.:
+        // ./gradlew assembleRelease -PversionCode=5 -PversionName=1.2.0
+        versionCode (project.hasProperty('versionCode') ? project.property('versionCode').toInteger() : 1)
+        versionName (project.hasProperty('versionName') ? project.property('versionName') : "1.0")
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -16,10 +33,24 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(signingStoreFile)
+                storePassword signingStorePassword
+                keyAlias signingKeyAlias
+                keyPassword signingKeyPassword
+            }
+        }
+    }
     buildTypes {
         release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
