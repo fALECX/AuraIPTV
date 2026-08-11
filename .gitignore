@@ -18,8 +18,8 @@ dist-ssr
 !.env.example
 
 # Android signing
-android/*.keystore
-android/*.jks
+**/*.keystore
+**/*.jks
 android/keystore.properties
 
 # Editor directories and files

@@ -77,7 +77,7 @@ jobs:
           fi
 
       - name: Decode release keystore
-        working-directory: android
+        working-directory: android/app
         run: echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > release.keystore
 
       - name: Make Gradle wrapper executable
@@ -98,7 +98,7 @@ jobs:
 
       - name: Remove decoded keystore
         if: always()
-        working-directory: android
+        working-directory: android/app
         run: rm -f release.keystore
 
       - name: Rename APK for release
