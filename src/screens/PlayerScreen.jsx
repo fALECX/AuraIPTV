@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { xtreamApi } from '../services/xtream';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { toast } from '../components/Toast';
 import { useHlsPlayer } from '../hooks/useHlsPlayer';
+import { getPlaybackSources } from '../services/playback';
+import { canUseNativeAndroidPlayer, openNativeAndroidPlayer } from '../services/nativePlayer';
 import './PlayerScreen.css';
 
 const BackIcon = () => (
@@ -45,13 +46,14 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
         } catch { return 1; }
     });
     const [streamError, setStreamError] = useState(false);
+    const [errorDetail, setErrorDetail] = useState('');
     const [transcodeFallback, setTranscodeFallback] = useState(() => {
         try {
             const settings = JSON.parse(localStorage.getItem('aura_player_settings') || '{}');
             return settings.preferredQuality === 'transcoded';
         } catch { return false; }
     });
-    const [lastInteractionTime, setLastInteractionTime] = useState(Date.now());
+    const [lastInteractionTime, setLastInteractionTime] = useState(() => Date.now());
     const [volume, setVolume] = useState(1);
     const [muted, setMuted] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
@@ -69,43 +71,92 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
         } catch { return true; }
     });
     const [audioMode, setAudioMode] = useState(false);
+    const [nativePlayerFailed, setNativePlayerFailed] = useState(false);
     const videoRef = useRef(null);
     const positionSaveRef = useRef(null);
     const sleepTimerRef = useRef(null);
     const wakeLockRef = useRef(null);
+    const nativeLaunchRef = useRef(null);
+    const onBackRef = useRef(onBack);
+    const onPlayNextRef = useRef(onPlayNext);
 
-    const currentExt = transcodeFallback ? 'm3u8' : (item?.extension || 'mp4');
-    const streamUrl = item?.type === 'live'
-        ? xtreamApi.getLiveStreamUrl(item.stream_id, 'm3u8')
-        : item?.type === 'series'
-            ? xtreamApi.getSeriesStreamUrl(item.stream_id, currentExt)
-            : xtreamApi.getVodStreamUrl(item.stream_id, currentExt);
+    useEffect(() => {
+        onBackRef.current = onBack;
+        onPlayNextRef.current = onPlayNext;
+    }, [onBack, onPlayNext]);
 
-    const onHlsFatalError = useCallback(() => setStreamError(true), []);
-    useHlsPlayer(videoRef, streamUrl, { onFatalError: onHlsFatalError });
+    const playbackSources = useMemo(
+        () => getPlaybackSources({
+            stream_id: item?.stream_id,
+            type: item?.type,
+            extension: item?.extension,
+        }),
+        [item?.stream_id, item?.type, item?.extension],
+    );
+    const itemId = item?.id;
+    const itemType = item?.type;
+    const positionKey = itemId ? `aura_pos_${itemId}` : null;
+    const streamUrl = transcodeFallback ? playbackSources.compatible : playbackSources.original;
+    const shouldUseNativePlayer = canUseNativeAndroidPlayer() && !nativePlayerFailed;
+
+    const handlePlaybackFailure = useCallback((detail = '') => {
+        setIsBuffering(false);
+
+        if (!transcodeFallback && playbackSources.compatible && playbackSources.compatible !== playbackSources.original) {
+            setTranscodeFallback(true);
+            setStreamError(false);
+            setErrorDetail('');
+            setPlaying(true);
+            toast.info('Trying a compatible stream source…');
+            return;
+        }
+
+        setPlaying(false);
+        setStreamError(true);
+        setErrorDetail(detail);
+    }, [playbackSources.compatible, playbackSources.original, transcodeFallback]);
+
+    const onHlsFatalError = useCallback(
+        (error) => handlePlaybackFailure(error?.details || 'The HLS stream could not be loaded.'),
+        [handlePlaybackFailure],
+    );
+    useHlsPlayer(videoRef, shouldUseNativePlayer ? null : streamUrl, { onFatalError: onHlsFatalError });
+
+    useEffect(() => {
+        let preferCompatible = false;
+        try {
+            const settings = JSON.parse(localStorage.getItem('aura_player_settings') || '{}');
+            preferCompatible = itemType !== 'live' && settings.preferredQuality === 'transcoded';
+        } catch { /* use original source */ }
+        setPlaying(true);
+        setTranscodeFallback(preferCompatible);
+        setStreamError(false);
+        setErrorDetail('');
+        setIsBuffering(true);
+        setNativePlayerFailed(false);
+        nativeLaunchRef.current = null;
+    }, [itemId, itemType]);
 
     // Check for saved position and offer resume
     useEffect(() => {
-        if (!item || item.type === 'live') return;
-        const key = POSITION_KEY(item);
-        const saved = parseFloat(localStorage.getItem(key));
+        if (!positionKey || itemType === 'live') return;
+        const saved = parseFloat(localStorage.getItem(positionKey));
         if (saved && saved > 10) {
             setResumePosition(saved);
             setShowResumePrompt(true);
         }
-    }, [item?.id]);
+    }, [itemType, positionKey]);
 
     // Save playback position every 5 seconds
     useEffect(() => {
-        if (!item || item.type === 'live') return;
+        if (!positionKey || itemType === 'live') return;
         positionSaveRef.current = setInterval(() => {
             if (videoRef.current && videoRef.current.currentTime > 5) {
-                const key = POSITION_KEY(item);
-                localStorage.setItem(key, videoRef.current.currentTime.toString());
+                localStorage.setItem(positionKey, videoRef.current.currentTime.toString());
             }
         }, 5000);
         return () => clearInterval(positionSaveRef.current);
-    }, [item?.id]);
+    }, [itemType, positionKey]);
 
     // Buffering detection
     useEffect(() => {
@@ -189,6 +240,11 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
         };
     }, [keepScreenOn]);
 
+    const seek = useCallback((timeChange) => {
+        if (!videoRef.current) return;
+        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime + timeChange);
+    }, []);
+
     // Media Session API for lock screen controls and background playback
     useEffect(() => {
         if (!('mediaSession' in navigator) || !item) return;
@@ -222,7 +278,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
         return () => {
             navigator.mediaSession.metadata = null;
         };
-    }, [item]);
+    }, [item, seek]);
 
     // Save settings when changed
     const saveSettings = useCallback((updates) => {
@@ -263,7 +319,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
 
     // Play / Pause
     useEffect(() => {
-        if (videoRef.current && !streamError) {
+        if (!shouldUseNativePlayer && videoRef.current && !streamError) {
             if (playing) {
                 videoRef.current.play().catch(e => {
                     console.warn('Autoplay prevented:', e);
@@ -273,7 +329,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
                 videoRef.current.pause();
             }
         }
-    }, [playing, streamError]);
+    }, [playing, shouldUseNativePlayer, streamError, streamUrl]);
 
     // Volume sync
     useEffect(() => {
@@ -303,6 +359,63 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
         }
     };
 
+    // Android playback runs in a native Media3 activity so MKV/HEVC and HLS are
+    // handled by the device media stack rather than the more limited WebView.
+    useEffect(() => {
+        if (!shouldUseNativePlayer || !item?.id || nativeLaunchRef.current === item.id) return;
+
+        let cancelled = false;
+        nativeLaunchRef.current = item.id;
+        setIsBuffering(true);
+
+        const savedPosition = itemType === 'live'
+            ? 0
+            : Math.max(0, Number.parseFloat(localStorage.getItem(positionKey)) || 0);
+
+        openNativeAndroidPlayer({
+            urls: playbackSources.nativeCandidates,
+            title: item.title || '',
+            subtitle: [item.genre, item.year].filter(Boolean).join(' · '),
+            isLive: itemType === 'live',
+            startPositionMs: Math.round(savedPosition * 1000),
+        }).then((result) => {
+            if (cancelled) return;
+            setIsBuffering(false);
+
+            if (itemType !== 'live' && result?.positionMs > 5000) {
+                localStorage.setItem(positionKey, String(result.positionMs / 1000));
+            }
+
+            if (result?.ended) {
+                localStorage.removeItem(positionKey);
+                setPlaying(false);
+                if (onPlayNextRef.current) onPlayNextRef.current();
+                else onBackRef.current({ keepPlaying: false });
+                return;
+            }
+
+            if (result?.error) {
+                setTranscodeFallback(true);
+                setPlaying(false);
+                setErrorDetail(result.error);
+                setStreamError(true);
+                return;
+            }
+
+            onBackRef.current({ keepPlaying: false });
+        }).catch((error) => {
+            if (cancelled) return;
+            console.warn('Native player unavailable, falling back to WebView playback:', error);
+            nativeLaunchRef.current = null;
+            setNativePlayerFailed(true);
+            setIsBuffering(true);
+            setStreamError(false);
+            setPlaying(true);
+        });
+
+        return () => { cancelled = true; };
+    }, [item?.genre, item?.id, item?.title, item?.type, item?.year, itemId, itemType, playbackSources.nativeCandidates, positionKey, shouldUseNativePlayer]);
+
     // Auto-next countdown
     useEffect(() => {
         if (!showNextCountdown) return;
@@ -314,11 +427,6 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
         const t = setTimeout(() => setNextCountdown(v => v - 1), 1000);
         return () => clearTimeout(t);
     }, [showNextCountdown, nextCountdown, onPlayNext]);
-
-    const seek = (timeChange) => {
-        if (!videoRef.current) return;
-        videoRef.current.currentTime = Math.max(0, videoRef.current.currentTime + timeChange);
-    };
 
     const cycleSpeed = () => {
         const speeds = [1, 1.25, 1.5, 2];
@@ -332,8 +440,12 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
     const toggleQuality = () => {
         const newValue = !transcodeFallback;
         setTranscodeFallback(newValue);
+        setStreamError(false);
+        setErrorDetail('');
+        setIsBuffering(true);
+        setPlaying(true);
         saveSettings({ preferredQuality: newValue ? 'transcoded' : 'original' });
-        toast.info(newValue ? 'Quality: Transcoded' : 'Quality: Original');
+        toast.info(newValue ? 'Source: Compatible HLS' : 'Source: Original');
     };
 
     const cycleSleepTimer = () => {
@@ -430,7 +542,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
             <video
                 ref={videoRef}
                 className="player-video-bg"
-                autoPlay
+                autoPlay={!shouldUseNativePlayer}
                 playsInline
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={() => {
@@ -440,7 +552,12 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
                     }
                 }}
                 onEnded={handleEnded}
-                onError={() => { console.error('Video error'); setStreamError(true); }}
+                onError={() => {
+                    const mediaError = videoRef.current?.error;
+                    const detail = mediaError?.message || `Media error ${mediaError?.code || 'unknown'}`;
+                    console.error('Video error:', detail);
+                    handlePlaybackFailure(detail);
+                }}
                 style={{
                     width: audioMode ? '1px' : '100%',
                     height: audioMode ? '1px' : '100%',
@@ -478,7 +595,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
             )}
 
             {/* Buffering Indicator */}
-            {isBuffering && (
+            {isBuffering && !streamError && (
                 <div style={{
                     position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
                     zIndex: 15, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12
@@ -549,22 +666,23 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
 
             {/* Error Overlay */}
             {streamError && (
-                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10, background: '#000', color: '#fff', flexDirection: 'column', padding: '20px', textAlign: 'center' }}>
+                <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 30, background: '#000', color: '#fff', flexDirection: 'column', padding: '20px', textAlign: 'center' }}>
                     <div style={{ marginBottom: '16px' }}>
                         <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>
                     </div>
                     <h3 style={{ margin: '0 0 8px 0', fontSize: '18px', fontWeight: 600 }}>Playback Error</h3>
                     <p style={{ margin: '0 0 20px 0', color: 'rgba(255,255,255,0.7)', fontSize: '14px', maxWidth: '300px' }}>
-                        This {item?.extension || 'mp4'} stream contains a codec your browser doesn't support natively (like HEVC), or the source link has expired.
+                        The stream could not be played after trying the available sources. It may use a codec this device cannot decode, or the provider link may have expired.
                     </p>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        <button onClick={onBack} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '10px 24px', borderRadius: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500 }}>
+                    {errorDetail && <p style={{ margin: '-10px 0 18px', color: 'rgba(255,255,255,0.45)', fontSize: '11px', maxWidth: '320px', overflowWrap: 'anywhere' }}>{errorDetail}</p>}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '12px' }}>
+                        <button onClick={() => onBack({ keepPlaying: false })} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: '10px 24px', borderRadius: '24px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px', fontWeight: 500 }}>
                             <BackIcon /> Go Back
                         </button>
                         {!transcodeFallback && (
-                            <button onClick={() => { setTranscodeFallback(true); setStreamError(false); setPlaying(true); setTimeout(() => videoRef.current?.load(), 50); }}
+                            <button onClick={() => { setTranscodeFallback(true); setStreamError(false); setErrorDetail(''); setIsBuffering(true); setPlaying(true); setTimeout(() => videoRef.current?.load(), 50); }}
                                 style={{ background: '#3b82f6', border: 'none', color: '#fff', padding: '10px 24px', borderRadius: '24px', cursor: 'pointer', fontSize: '14px', fontWeight: 500 }}>
-                                Try Transcoded Stream
+                                Try Compatible Source
                             </button>
                         )}
                     </div>

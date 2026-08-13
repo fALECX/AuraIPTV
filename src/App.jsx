@@ -58,11 +58,13 @@ export default function App() {
     setScreen('player');
   };
 
-  const goBack = () => {
+  const goBack = ({ keepPlaying = true } = {}) => {
     if (screen === 'player') {
       // Show mini player when going back from player
-      if (playingItem) {
+      if (playingItem && keepPlaying) {
         setShowMiniPlayer(true);
+      } else {
+        setShowMiniPlayer(false);
       }
       setScreen('detail');
     }

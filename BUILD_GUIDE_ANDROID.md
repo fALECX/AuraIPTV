@@ -3,22 +3,20 @@
 Follow these steps to generate a signed production build for the Google Play Store.
 
 ## 1. Prerequisites
-- **Android Studio** installed.
-- **Java Development Kit (JDK)** installed.
-- **Node.js & npm** installed.
+- **Node.js 22+** and npm installed.
+- **JDK 21** (a full JDK containing `jlink`, not a stripped runtime).
+- **Android SDK Platform 36** and Build Tools 35.0.0. Android Studio is optional if the command-line tools are installed.
+
+Verify the complete web and Android toolchain:
+```bash
+npm run verify
+npm run android:build
+```
+
+The Windows Android build helper detects `JAVA_HOME`, `ANDROID_HOME`, the default user SDK, and Aura's optional portable JDK automatically.
 
 ## 2. Prepare Assets
-The icons and splash screens I generated are located in the `C:\Users\samue\.gemini\antigravity\brain\9b5863d4-bb78-47eb-8f2c-e51a2930a749` directory.
-To officially apply them to your Android project:
-1. Install the capacitor-assets tool:
-   ```bash
-   npm install @capacitor/assets --save-dev
-   ```
-2. Place the `aura_app_icon.png` as `assets/logo.png` and `aura_splash_screen.png` as `assets/splash.png`.
-3. Run the generator:
-   ```bash
-   npx capacitor-assets generate --android
-   ```
+The generated Android icons and splash resources are already committed under `android/app/src/main/res`; no extra asset generator is required for normal builds.
 
 ## 3. Generate Release Keystore
 You need a keystore to sign your app. Run this command in your terminal (replace `YOUR_PASSWORD`):
@@ -28,13 +26,10 @@ keytool -genkey -v -keystore aura-release.keystore -alias aura-alias -keyalg RSA
 **IMPORTANT**: Keep this file (`aura-release.keystore`) safe. If you lose it, you cannot update your app in the future.
 
 ## 4. Build the App
-1. Build the web project:
+1. Build, test, and sync the web project:
    ```bash
-   npm run build
-   ```
-2. Sync with Android:
-   ```bash
-   npx cap sync android
+   npm run verify
+   npm run android:sync
    ```
 3. Open Android Studio:
    ```bash

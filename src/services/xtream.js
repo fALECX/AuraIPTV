@@ -2,7 +2,7 @@ const parseUrl = (baseUrl) => {
     try {
         const url = new URL(baseUrl.startsWith('http') ? baseUrl : `http://${baseUrl}`);
         return url.origin; // e.g., http://example.com:8080
-    } catch (e) {
+    } catch (_error) {
         return baseUrl;
     }
 };
@@ -37,7 +37,7 @@ class CacheDB {
                 request.onsuccess = () => resolve(request.result);
                 request.onerror = () => resolve(null);
             });
-        } catch (e) { return null; }
+        } catch (_error) { return null; }
     }
 
     async set(key, value) {
@@ -45,7 +45,7 @@ class CacheDB {
             const db = await this._getDB();
             const transaction = db.transaction(this.storeName, 'readwrite');
             transaction.objectStore(this.storeName).put(value, key);
-        } catch (e) { console.error('Cache set error:', e); }
+        } catch (error) { console.error('Cache set error:', error); }
     }
 
     async clear() {
@@ -53,7 +53,7 @@ class CacheDB {
             const db = await this._getDB();
             const transaction = db.transaction(this.storeName, 'readwrite');
             transaction.objectStore(this.storeName).clear();
-        } catch (e) { }
+        } catch (_error) { }
     }
 }
 
@@ -162,7 +162,7 @@ class XtreamService {
         try {
             const data = await this._executeFetch(action, extraParams, cacheKey);
             if (onUpdate) onUpdate(data);
-        } catch (e) {
+        } catch (_error) {
             console.warn('Background refresh failed:', action);
         }
     }

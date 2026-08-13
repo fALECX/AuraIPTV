@@ -14,6 +14,9 @@ def signingStorePassword = keystoreProperties.getProperty('storePassword') ?: Sy
 def signingKeyAlias = keystoreProperties.getProperty('keyAlias') ?: System.getenv('ANDROID_KEY_ALIAS')
 def signingKeyPassword = keystoreProperties.getProperty('keyPassword') ?: System.getenv('ANDROID_KEY_PASSWORD')
 def hasReleaseSigning = signingStoreFile && signingStorePassword && signingKeyAlias && signingKeyPassword
+def appVersionName = new groovy.json.JsonSlurper().parse(rootProject.file('../package.json')).version.toString()
+def appVersionParts = appVersionName.tokenize('.').collect { it.toInteger() }
+def appVersionCode = appVersionParts[0] * 1000000 + appVersionParts[1] * 1000 + appVersionParts[2]
 
 android {
     namespace = "com.aura.iptv"
@@ -23,9 +26,9 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         // Overridable from the command line for release builds, e.g.:
-        // ./gradlew assembleRelease -PversionCode=5 -PversionName=1.2.0
-        versionCode (project.hasProperty('versionCode') ? project.property('versionCode').toInteger() : 1)
-        versionName (project.hasProperty('versionName') ? project.property('versionName') : "1.0")
+        // ./gradlew assembleRelease -PversionCode=1002000 -PversionName=1.2.0
+        versionCode (project.hasProperty('versionCode') ? project.property('versionCode').toInteger() : appVersionCode)
+        versionName (project.hasProperty('versionName') ? project.property('versionName') : appVersionName)
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -66,10 +69,15 @@ dependencies {
     implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
     implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
     implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    def media3Version = "1.10.1"
+    implementation "androidx.media3:media3-exoplayer:$media3Version"
+    implementation "androidx.media3:media3-exoplayer-hls:$media3Version"
+    implementation "androidx.media3:media3-ui:$media3Version"
     implementation project(':capacitor-android')
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    androidTestImplementation "androidx.test.uiautomator:uiautomator:2.3.0"
     implementation project(':capacitor-cordova-android-plugins')
 }
 

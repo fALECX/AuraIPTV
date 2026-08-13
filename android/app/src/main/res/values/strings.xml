@@ -4,4 +4,9 @@
     <string name="title_activity_main">Aura</string>
     <string name="package_name">com.aura.iptv</string>
     <string name="custom_url_scheme">com.aura.iptv</string>
+    <string name="player_error_title">Playback Error</string>
+    <string name="player_go_back">Go Back</string>
+    <string name="player_retry">Retry</string>
+    <string name="player_trying_fallback">Trying compatible stream source…</string>
+    <string name="player_error_message">The available sources could not be decoded or reached. Check the provider link and the device codec support.\n\n%1$s</string>
 </resources>

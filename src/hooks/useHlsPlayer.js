@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
-import Hls from 'hls.js';
 
-const isM3u8 = (url) => !!url && url.split('?')[0].toLowerCase().endsWith('.m3u8');
+export const isM3u8 = (url) => !!url && url.split('?')[0].toLowerCase().endsWith('.m3u8');
 
 /**
  * Attaches an HLS (.m3u8) source to a <video> element.
@@ -27,34 +26,63 @@ export function useHlsPlayer(videoRef, src, { onFatalError } = {}) {
             return;
         }
 
-        if (!Hls.isSupported()) {
-            // No hls.js support and no native support — let the caller's onError handle it.
-            video.src = src;
-            return;
-        }
+        let disposed = false;
 
-        const hls = new Hls({ enableWorker: true });
-        hlsRef.current = hls;
-        hls.loadSource(src);
-        hls.attachMedia(video);
+        const attachHls = async () => {
+            const { default: Hls } = await import('hls.js');
+            if (disposed) return;
 
-        hls.on(Hls.Events.ERROR, (_event, data) => {
-            if (!data.fatal) return;
-            switch (data.type) {
-                case Hls.ErrorTypes.NETWORK_ERROR:
-                    hls.startLoad();
-                    break;
-                case Hls.ErrorTypes.MEDIA_ERROR:
-                    hls.recoverMediaError();
-                    break;
-                default:
-                    onFatalError?.(data);
-                    break;
+            if (!Hls.isSupported()) {
+                // Let the media element report the failure so another source can be tried.
+                video.src = src;
+                return;
             }
-        });
+
+            let networkRecoveries = 0;
+            let mediaRecoveries = 0;
+            const hls = new Hls({
+                enableWorker: true,
+                backBufferLength: 30,
+                maxBufferLength: 30,
+                manifestLoadingMaxRetry: 3,
+                levelLoadingMaxRetry: 3,
+                fragLoadingMaxRetry: 3,
+            });
+            hlsRef.current = hls;
+            hls.loadSource(src);
+            hls.attachMedia(video);
+
+            hls.on(Hls.Events.ERROR, (_event, data) => {
+                if (!data.fatal) return;
+                switch (data.type) {
+                    case Hls.ErrorTypes.NETWORK_ERROR:
+                        if (networkRecoveries < 2) {
+                            networkRecoveries += 1;
+                            hls.startLoad();
+                        } else {
+                            onFatalError?.(data);
+                        }
+                        break;
+                    case Hls.ErrorTypes.MEDIA_ERROR:
+                        if (mediaRecoveries < 2) {
+                            mediaRecoveries += 1;
+                            hls.recoverMediaError();
+                        } else {
+                            onFatalError?.(data);
+                        }
+                        break;
+                    default:
+                        onFatalError?.(data);
+                        break;
+                }
+            });
+        };
+
+        attachHls().catch((error) => onFatalError?.({ details: error.message }));
 
         return () => {
-            hls.destroy();
+            disposed = true;
+            hlsRef.current?.destroy();
             hlsRef.current = null;
         };
     }, [videoRef, src, onFatalError]);
