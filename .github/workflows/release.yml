@@ -101,7 +101,7 @@ jobs:
       - name: Build signed release APK
         working-directory: android
         run: |
-          ANDROID_HOME="$ANDROID_SDK_ROOT" ./gradlew testDebugUnitTest lintRelease assembleRelease --no-daemon --stacktrace \
+          ANDROID_HOME="$ANDROID_SDK_ROOT" ./gradlew :app:testDebugUnitTest :app:lintRelease :app:assembleRelease --no-daemon --stacktrace \
             -PversionCode=${{ steps.version.outputs.code }} \
             -PversionName=${{ steps.version.outputs.name }}
         env:

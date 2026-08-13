@@ -59,7 +59,7 @@ jobs:
 
       - name: Build debug APK
         working-directory: android
-        run: ANDROID_HOME="$ANDROID_SDK_ROOT" ./gradlew testDebugUnitTest lintDebug assembleDebugAndroidTest assembleDebug --no-daemon --stacktrace
+        run: ANDROID_HOME="$ANDROID_SDK_ROOT" ./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebugAndroidTest :app:assembleDebug --no-daemon --stacktrace
 
       - name: Upload debug APK artifact
         uses: actions/upload-artifact@v4
