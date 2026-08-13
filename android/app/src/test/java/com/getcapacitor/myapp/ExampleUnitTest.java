@@ -1,4 +1,4 @@
-package com.getcapacitor.myapp;
+package com.aura.iptv;
 
 import static org.junit.Assert.*;
 
@@ -12,7 +12,7 @@ import org.junit.Test;
 public class ExampleUnitTest {
 
     @Test
-    public void addition_isCorrect() throws Exception {
+    public void arithmeticSanityCheck() {
         assertEquals(4, 2 + 2);
     }
 }

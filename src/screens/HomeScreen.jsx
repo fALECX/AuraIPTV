@@ -8,6 +8,8 @@ import { getStoredProfiles, saveStoredProfiles } from '../utils/storage';
 import { getContinueWatchingItems } from '../utils/watchProgress';
 import ConfirmModal from '../components/ConfirmModal';
 import InlineEditModal from '../components/InlineEditModal';
+import MediaCard from '../components/MediaCard';
+import { createDemoRawData, getSearchCopy, mapLive, mapSeries, mapVod, searchContentForTab } from '../utils/contentSearch';
 
 const SearchIcon = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -62,95 +64,6 @@ const ClockIcon = () => (
         <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
     </svg>
 );
-
-function MediaCard({ item, onSelect, onPlay, showProgress = false }) {
-    const progress = showProgress && item.watchPosition ? (item.watchPosition / (item.duration || 3600)) * 100 : null;
-    const longPressTimeout = useRef(null);
-
-    const handleQuickPlay = () => {
-        if (onPlay && item.type !== 'series') {
-            onPlay(item);
-        }
-    };
-
-    return (
-        <div
-            className="media-card"
-            onClick={() => onSelect(item)}
-            onContextMenu={(e) => {
-                e.preventDefault();
-                handleQuickPlay();
-            }}
-            onTouchStart={(e) => {
-                longPressTimeout.current = setTimeout(() => {
-                    handleQuickPlay();
-                }, 500);
-            }}
-            onTouchEnd={() => {
-                if (longPressTimeout.current) {
-                    clearTimeout(longPressTimeout.current);
-                }
-            }}
-        >
-            <div className="media-card-img-wrap">
-                <img className="media-card-img" src={item.poster} alt={item.title} loading="lazy" onError={(e) => { e.target.src = 'https://via.placeholder.com/400x600?text=No+Image' }} />
-                {item.type === 'live' && (
-                    <div className="media-card-live-badge">
-                        <span className="live-dot" /> LIVE
-                    </div>
-                )}
-                {progress !== null && (
-                    <div className="media-card-progress" style={{ width: `${Math.min(progress, 100)}%` }} />
-                )}
-            </div>
-            <div className="media-card-title">{item.title}</div>
-            <div className="media-card-meta">{item.genre} {item.year ? `· ${item.year}` : ''}</div>
-        </div>
-    );
-}
-
-const mapLive = (s) => ({
-    id: `live_${s.stream_id}`,
-    stream_id: s.stream_id,
-    title: s.name,
-    genre: 'Live TV',
-    type: 'live',
-    poster: s.stream_icon || 'https://via.placeholder.com/400x600?text=Live+TV',
-    hero: s.stream_icon,
-    desc: 'Live TV Channel',
-    added: parseInt(s.added) || 0,
-    rating: 0
-});
-
-const mapVod = (v) => ({
-    id: `vod_${v.stream_id}`,
-    stream_id: v.stream_id,
-    title: v.name,
-    genre: 'Movie',
-    rating: parseFloat(v.rating) || 0,
-    year: v.year || '',
-    type: 'movie',
-    poster: v.stream_icon || 'https://images.unsplash.com/photo-1446776811953-b23d57bd21aa?w=400&q=80',
-    hero: v.stream_icon,
-    desc: v.name,
-    added: parseInt(v.added) || 0,
-    extension: v.container_extension || 'mp4'
-});
-
-const mapSeries = (s) => ({
-    id: `series_${s.series_id}`,
-    stream_id: s.series_id,
-    title: s.name,
-    genre: 'Series',
-    rating: parseFloat(s.rating) || 0,
-    year: s.year || '',
-    type: 'series',
-    poster: s.cover || 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&q=80',
-    hero: s.cover,
-    desc: s.name,
-    added: parseInt(s.last_modified) || parseInt(s.added) || 0,
-    extension: s.container_extension || 'mp4'
-});
 
 export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveTab, credentials, selectedCategoryIds, setSelectedCategoryIds, onLogout, onUpdateCredentials }) {
     const [loading, setLoading] = useState(true);
@@ -212,6 +125,11 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
         };
 
         const loadHome = async () => {
+            if (credentials?.url === 'demo') {
+                const demo = createDemoRawData(MOCK_CATEGORIES);
+                updateState(demo.live, demo.vod, demo.series);
+                return;
+            }
             try {
                 const [live, vods, series] = await Promise.all([
                     xtreamApi.getLiveStreams(null, (newData) => updateState(newData, rawData.current.vod, rawData.current.series)),
@@ -229,7 +147,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
         };
         loadHome();
         return () => { mounted = false; };
-    }, []);
+    }, [credentials]);
 
     // Load sub-tab categories
     useEffect(() => {
@@ -254,6 +172,13 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
 
         const loadCategories = async () => {
             setLoading(true);
+            if (credentials?.url === 'demo') {
+                const demo = createDemoRawData(MOCK_CATEGORIES);
+                const rawList = activeTab === 'live' ? demo.live : activeTab === 'movies' ? demo.vod : demo.series;
+                updateCats([{ category_id: 'demo', category_name: 'Demo' }], rawList);
+                setLoading(false);
+                return;
+            }
             try {
                 let cats = [], rawList = [];
                 if (activeTab === 'live') {
@@ -280,7 +205,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
             }
         };
         loadCategories();
-    }, [activeTab]);
+    }, [activeTab, credentials]);
 
     // Filter by category (local)
     useEffect(() => {
@@ -329,13 +254,8 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
     useEffect(() => {
         if (!searchQuery || searchQuery.trim().length < 2) { setSearchResults([]); return; }
         const timer = setTimeout(() => {
-            const query = searchQuery.toLowerCase();
-            const { live, vod, series } = rawData.current;
-            setSearchResults([
-                ...live.filter(i => (i.name || '').toLowerCase().includes(query)).slice(0, 20).map(mapLive),
-                ...vod.filter(i => (i.name || '').toLowerCase().includes(query)).slice(0, 30).map(mapVod),
-                ...series.filter(i => (i.name || '').toLowerCase().includes(query)).slice(0, 20).map(mapSeries),
-            ]);
+            const query = searchQuery.trim().toLocaleLowerCase();
+            setSearchResults(searchContentForTab(rawData.current, activeTab, searchQuery));
             // Save to search history
             const currentHist = JSON.parse(localStorage.getItem('aura_search_history') || '[]');
             const filtered = currentHist.filter(h => h.toLowerCase() !== query);
@@ -344,7 +264,17 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
             setSearchHistory(updated);
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery]);
+    }, [searchQuery, activeTab]);
+
+    const searchCopy = getSearchCopy(activeTab);
+
+    const changeTab = (nextTab) => {
+        if (nextTab !== activeTab) setSelectedCategoryIds([]);
+        setSearchQuery('');
+        setSearchResults([]);
+        setIsSearchActive(false);
+        setActiveTab(nextTab);
+    };
 
     const handleClearCache = async () => {
         try {
@@ -426,17 +356,18 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                 autoFocus
                                 className="search-input-field"
                                 type="text"
-                                placeholder="Search channels, movies..."
+                                placeholder={searchCopy.placeholder}
+                                aria-label={searchCopy.placeholder}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <button className="search-close-btn" onClick={() => { setIsSearchActive(false); setSearchQuery(''); }}>
+                        <button className="search-close-btn" aria-label="Close search" onClick={() => { setIsSearchActive(false); setSearchQuery(''); }}>
                             <XIcon />
                         </button>
                     </div>
 
-                    <div className="search-results">
+                    <div className="search-results" aria-label={`${searchCopy.label} search results`}>
                         {searchQuery.length >= 2 ? (
                             searchResults.length > 0 ? (
                                 searchResults.map(item => (
@@ -593,7 +524,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                         <div key={cat.id} className="category-section">
                                             <div className="category-header">
                                                 <span className="category-title">{cat.title}</span>
-                                                <span className="category-see-all" onClick={() => { setActiveTab(cat.id === 'movies' ? 'movies' : cat.id === 'series' ? 'series' : 'live'); setSelectedCategoryIds([]); }}>See all →</span>
+                                                <span className="category-see-all" onClick={() => changeTab(cat.id === 'movies' ? 'movies' : cat.id === 'series' ? 'series' : 'live')}>See all →</span>
                                             </div>
                                             <div className="category-slider">
                                                 {cat.items.map(item => (
@@ -648,7 +579,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                     </div>
 
                                     <div style={{ marginTop: 40, opacity: 0.5, fontSize: 12, textAlign: 'center' }}>
-                                        Aura IPTV v1.0.0<br />
+                                        Aura IPTV v{import.meta.env.VITE_APP_VERSION}<br />
                                         Premium UI Edition
                                     </div>
                                 </div>
@@ -676,10 +607,16 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                     { id: 'series', label: 'Series', Icon: SeriesIcon },
                     { id: 'settings', label: 'Settings', Icon: SettingsIcon },
                 ].map(({ id, label, Icon }) => (
-                    <div key={id} className={`nav-item ${activeTab === id ? 'active' : ''}`} onClick={() => setActiveTab(id)}>
+                    <button
+                        type="button"
+                        key={id}
+                        className={`nav-item ${activeTab === id ? 'active' : ''}`}
+                        aria-current={activeTab === id ? 'page' : undefined}
+                        onClick={() => changeTab(id)}
+                    >
                         <Icon active={activeTab === id} />
                         <span className="nav-item-label">{label}</span>
-                    </div>
+                    </button>
                 ))}
             </nav>
 

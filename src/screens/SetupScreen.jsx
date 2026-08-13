@@ -88,7 +88,7 @@ export default function SetupScreen({ onConnect }) {
             } else {
                 toast.error(res.error || 'Connection Failed');
             }
-        } catch (err) {
+        } catch (_err) {
             toast.error('Error connecting to provider');
         } finally {
             setLoading(false);
@@ -222,7 +222,7 @@ export default function SetupScreen({ onConnect }) {
                 <div className="setup-legal-links">
                     <a href="/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
                     <span className="dot">•</span>
-                    <span>Version 1.0.0</span>
+                    <span>Version {import.meta.env.VITE_APP_VERSION}</span>
                 </div>
             </div>
         </div>

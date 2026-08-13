@@ -1,21 +1,37 @@
-import { useState, useEffect, useRef } from 'react';
-import { xtreamApi } from '../services/xtream';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useHlsPlayer } from '../hooks/useHlsPlayer';
+import { getPlaybackSources } from '../services/playback';
 import './MiniPlayer.css';
 
-export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
+export default function MiniPlayer({ item, onExpand, onClose }) {
     const [playing, setPlaying] = useState(true);
     const [progress, setProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
     const [position, setPosition] = useState({ x: 16, y: 100 });
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+    const [useCompatibleSource, setUseCompatibleSource] = useState(false);
     const videoRef = useRef(null);
 
-    const streamUrl = item?.type === 'live'
-        ? xtreamApi.getLiveStreamUrl(item.stream_id, 'm3u8')
-        : xtreamApi.getVodStreamUrl(item.stream_id, item?.extension || 'mp4');
+    const playbackSources = useMemo(() => getPlaybackSources({
+        stream_id: item?.stream_id,
+        type: item?.type,
+        extension: item?.extension,
+    }), [item?.extension, item?.stream_id, item?.type]);
+    const streamUrl = useCompatibleSource ? playbackSources.compatible : playbackSources.original;
 
-    useHlsPlayer(videoRef, streamUrl);
+    const handlePlaybackError = useCallback(() => {
+        if (!useCompatibleSource && playbackSources.compatible !== playbackSources.original) {
+            setUseCompatibleSource(true);
+        } else {
+            setPlaying(false);
+        }
+    }, [playbackSources.compatible, playbackSources.original, useCompatibleSource]);
+
+    useHlsPlayer(videoRef, streamUrl, {
+        onFatalError: handlePlaybackError,
+    });
+
+    useEffect(() => setUseCompatibleSource(false), [item?.id]);
 
     useEffect(() => {
         if (videoRef.current && playing) {
@@ -40,17 +56,18 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
         });
     };
 
-    const handleMouseMove = (e) => {
+    const handleMouseMove = useCallback((e) => {
         if (!isDragging) return;
+        const point = e.touches?.[0] || e;
         setPosition({
-            x: e.clientX - dragOffset.x,
-            y: Math.max(0, e.clientY - dragOffset.y)
+            x: point.clientX - dragOffset.x,
+            y: Math.max(0, point.clientY - dragOffset.y)
         });
-    };
+    }, [dragOffset.x, dragOffset.y, isDragging]);
 
-    const handleMouseUp = () => {
+    const handleMouseUp = useCallback(() => {
         setIsDragging(false);
-    };
+    }, []);
 
     useEffect(() => {
         window.addEventListener('mousemove', handleMouseMove);
@@ -63,7 +80,7 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
             window.removeEventListener('touchmove', handleMouseMove);
             window.removeEventListener('touchend', handleMouseUp);
         };
-    }, [isDragging, dragOffset]);
+    }, [handleMouseMove, handleMouseUp]);
 
     if (!item) return null;
 
@@ -114,6 +131,7 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
                 playsInline
                 muted
                 onTimeUpdate={handleTimeUpdate}
+                onError={handlePlaybackError}
                 onClick={(e) => { e.stopPropagation(); onExpand(); }}
             />
 

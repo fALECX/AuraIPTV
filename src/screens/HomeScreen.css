@@ -226,6 +226,16 @@
     width: 130px;
     cursor: pointer;
     scroll-snap-align: start;
+    appearance: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    touch-action: pan-x pan-y;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .media-card-img-wrap {
@@ -243,6 +253,7 @@
     height: 100%;
     object-fit: cover;
     transition: transform 0.3s ease;
+    -webkit-user-drag: none;
 }
 
 .media-card:active .media-card-img {
@@ -659,6 +670,12 @@
     cursor: pointer;
     opacity: 0.45;
     transition: var(--transition);
+    appearance: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
 }
 
 .nav-item.active {

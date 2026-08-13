@@ -22,7 +22,7 @@ export default function VirtualizedGrid({
     const columns = useMemo(() => {
         const containerWidth = containerRef?.current?.offsetWidth || 320;
         return Math.max(2, Math.floor((containerWidth - gap) / (itemWidth + gap)));
-    }, [containerRef?.current?.offsetWidth, itemWidth, gap]);
+    }, [containerRef, itemWidth, gap]);
 
     const rows = useMemo(() => {
         return Math.ceil(items.length / columns);
