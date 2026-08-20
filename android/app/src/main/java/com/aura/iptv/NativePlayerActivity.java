@@ -1,10 +1,14 @@
 package com.aura.iptv;
 
 import android.app.Activity;
+import android.app.PictureInPictureParams;
+import android.content.res.Configuration;
 import android.content.Intent;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Build;
+import android.util.Rational;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
@@ -49,6 +53,7 @@ public class NativePlayerActivity extends AppCompatActivity {
     private ExoPlayer player;
     private PlayerView playerView;
     private LinearLayout errorPanel;
+    private LinearLayout header;
     private TextView errorMessage;
     private ArrayList<String> urls = new ArrayList<>();
     private int sourceIndex = 0;
@@ -107,7 +112,7 @@ public class NativePlayerActivity extends AppCompatActivity {
             ViewGroup.LayoutParams.MATCH_PARENT
         ));
 
-        LinearLayout header = new LinearLayout(this);
+        header = new LinearLayout(this);
         header.setOrientation(LinearLayout.HORIZONTAL);
         header.setGravity(Gravity.CENTER_VERTICAL);
         header.setPadding(dp(12), dp(16), dp(16), dp(8));
@@ -140,6 +145,19 @@ public class NativePlayerActivity extends AppCompatActivity {
         subtitle.setMaxLines(1);
         titleBlock.addView(subtitle);
         header.addView(titleBlock, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Button pip = new Button(this);
+            pip.setText("PiP");
+            pip.setTextSize(12);
+            pip.setTextColor(Color.WHITE);
+            pip.setContentDescription("Picture in picture");
+            pip.setBackgroundColor(0x66000000);
+            pip.setMinWidth(dp(56));
+            pip.setMinHeight(dp(48));
+            pip.setOnClickListener(view -> enterPictureInPicture());
+            header.addView(pip, new LinearLayout.LayoutParams(dp(68), dp(48)));
+        }
 
         FrameLayout.LayoutParams headerParams = new FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -284,6 +302,27 @@ public class NativePlayerActivity extends AppCompatActivity {
         lastDurationMs = duration > 0 ? duration : 0L;
     }
 
+    private void enterPictureInPicture() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || isInPictureInPictureMode()) return;
+        int width = 16;
+        int height = 9;
+        if (player != null && player.getVideoSize().width > 0 && player.getVideoSize().height > 0) {
+            width = player.getVideoSize().width;
+            height = player.getVideoSize().height;
+        }
+        PictureInPictureParams params = new PictureInPictureParams.Builder()
+            .setAspectRatio(new Rational(width, height))
+            .build();
+        enterPictureInPictureMode(params);
+    }
+
+    @Override
+    public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
+        if (header != null) header.setVisibility(isInPictureInPictureMode ? View.GONE : View.VISIBLE);
+        if (playerView != null) playerView.setUseController(!isInPictureInPictureMode);
+    }
+
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
     }
@@ -292,6 +331,14 @@ public class NativePlayerActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         capturePlayerState();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        WindowInsetsControllerCompat insets = WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView());
+        insets.hide(WindowInsetsCompat.Type.systemBars());
+        insets.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
     }
 
     @Override

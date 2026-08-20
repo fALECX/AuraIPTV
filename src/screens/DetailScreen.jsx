@@ -3,6 +3,7 @@ import './DetailScreen.css';
 import './Skeleton.css';
 import { xtreamApi } from '../services/xtream';
 import { toast } from '../components/Toast';
+import { getWatchProgressDetails } from '../utils/watchProgress';
 
 const BackIcon = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -23,6 +24,34 @@ const ShareIcon = () => (
         <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
     </svg>
 );
+
+const EpisodeProgress = ({ episode }) => {
+    const progress = getWatchProgressDetails({
+        id: episode.id,
+        type: 'series',
+        duration: episode.info?.duration,
+    });
+    if (!progress) return null;
+
+    return (
+        <>
+            {progress.watched && <span className="episode-watched-badge" aria-label="Watched">&#10003;</span>}
+            <div className="episode-progress-track" aria-label={`${Math.round(progress.percentage)}% watched`}>
+                <div className="episode-progress-fill" style={{ width: `${progress.percentage}%` }} />
+            </div>
+        </>
+    );
+};
+
+const EpisodeStatus = ({ episode }) => {
+    const progress = getWatchProgressDetails({
+        id: episode.id,
+        type: 'series',
+        duration: episode.info?.duration,
+    });
+    if (!progress) return null;
+    return <span className={`episode-status ${progress.watched ? 'watched' : ''}`}>{progress.watched ? 'Watched' : `${Math.round(progress.percentage)}% watched`}</span>;
+};
 
 export default function DetailScreen({ item, onPlay, onBack, onSelectItem, credentials }) {
     const [isFavorite, setIsFavorite] = useState(false);
@@ -220,9 +249,11 @@ export default function DetailScreen({ item, onPlay, onBack, onSelectItem, crede
                                         <div className="episode-thumb-wrap">
                                             <img className="episode-thumb" src={ep.info?.movie_image || item.poster} alt={ep.title} />
                                             <div className="episode-play-overlay"><PlayFill /></div>
+                                            <EpisodeProgress episode={ep} />
                                         </div>
                                         <div className="episode-info">
                                             <div className="episode-title">{ep.title || `Episode ${ep.episode_num}`}</div>
+                                            <EpisodeStatus episode={ep} />
                                             <div className="episode-meta">Episode {ep.episode_num} {ep.info?.duration ? `• ${ep.info.duration}` : ''}</div>
                                         </div>
                                     </div>

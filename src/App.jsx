@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import SetupScreen from './screens/SetupScreen';
 import HomeScreen from './screens/HomeScreen';
 import PlayerScreen from './screens/PlayerScreen';
@@ -18,6 +20,7 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [playNextFn, setPlayNextFn] = useState(null);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
+  const [allowStartupAutoLogin, setAllowStartupAutoLogin] = useState(true);
 
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
@@ -27,10 +30,11 @@ export default function App() {
     return () => { window.removeEventListener('online', onOnline); window.removeEventListener('offline', onOffline); };
   }, []);
 
-  const goHome = (creds) => {
+  const goHome = useCallback((creds) => {
     if (creds) setCredentials(creds);
+    setAllowStartupAutoLogin(false);
     setScreen('home');
-  };
+  }, []);
 
   const goDetail = (item) => {
     setSelectedItem(item);
@@ -47,7 +51,9 @@ export default function App() {
         setSelectedItem(item);
       }
       // Save to watch history — store the series parent, not individual episode
-      const historyItem = parentItem || item;
+      const historyItem = parentItem
+        ? { ...parentItem, resumeItem: item, lastWatchedAt: Date.now() }
+        : { ...item, lastWatchedAt: Date.now() };
       const histKey = credentials ? `aura_hist_${credentials.username}` : 'aura_hist_guest';
       let hist = JSON.parse(localStorage.getItem(histKey) || '[]');
       hist = hist.filter(h => h.id !== historyItem.id);
@@ -58,7 +64,7 @@ export default function App() {
     setScreen('player');
   };
 
-  const goBack = ({ keepPlaying = true } = {}) => {
+  const goBack = useCallback(({ keepPlaying = true } = {}) => {
     if (screen === 'player') {
       // Show mini player when going back from player
       if (playingItem && keepPlaying) {
@@ -70,10 +76,25 @@ export default function App() {
     }
     else if (screen === 'detail') setScreen('home');
     else setScreen('home');
-  };
+  }, [playingItem, screen]);
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return undefined;
+
+    let listener;
+    CapacitorApp.addListener('backButton', () => {
+      if (screen === 'player') goBack({ keepPlaying: false });
+      else if (screen === 'detail') setScreen('home');
+      else if (screen === 'home' && activeTab !== 'home') setActiveTab('home');
+      else CapacitorApp.minimizeApp();
+    }).then(handle => { listener = handle; });
+
+    return () => { listener?.remove(); };
+  }, [activeTab, goBack, screen]);
 
   const handleLogout = () => {
     setCredentials(null);
+    setAllowStartupAutoLogin(false);
     setScreen('setup');
   };
 
@@ -105,7 +126,7 @@ export default function App() {
         )}
 
         {screen === 'setup' && (
-          <SetupScreen onConnect={goHome} key="setup" />
+          <SetupScreen onConnect={goHome} autoLogin={allowStartupAutoLogin} key="setup" />
         )}
         {screen === 'home' && (
           <HomeScreen
@@ -148,6 +169,7 @@ export default function App() {
           item={playingItem}
           onExpand={() => {
             setShowMiniPlayer(false);
+            setPlayingItem(current => current ? { ...current, autoResume: true } : current);
             setScreen('player');
           }}
           onClose={() => {

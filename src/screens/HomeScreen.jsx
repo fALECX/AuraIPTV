@@ -4,8 +4,8 @@ import './Skeleton.css';
 import { xtreamApi } from '../services/xtream';
 import './HomeScreen.css';
 import { toast } from '../components/Toast';
-import { getStoredProfiles, saveStoredProfiles } from '../utils/storage';
-import { getContinueWatchingItems } from '../utils/watchProgress';
+import { getStoredProfiles, saveStoredProfiles, setLastUsedProfile } from '../utils/storage';
+import { getContinueWatchingItems, getHistoryForTab, hasBeenWatched } from '../utils/watchProgress';
 import ConfirmModal from '../components/ConfirmModal';
 import InlineEditModal from '../components/InlineEditModal';
 import MediaCard from '../components/MediaCard';
@@ -90,6 +90,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
     const [editField, setEditField] = useState(null); // { field, label, value }
 
     const rawData = useRef({ live: [], vod: [], series: [] });
+    const searchInputRef = useRef(null);
 
     // Load initial home data & Favorites
     useEffect(() => {
@@ -267,6 +268,11 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
     }, [searchQuery, activeTab]);
 
     const searchCopy = getSearchCopy(activeTab);
+    const tabHistory = useMemo(() => getHistoryForTab(history, activeTab, 10), [activeTab, history]);
+    const dismissSearchKeyboard = () => {
+        searchInputRef.current?.blur();
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    };
 
     const changeTab = (nextTab) => {
         if (nextTab !== activeTab) setSelectedCategoryIds([]);
@@ -325,6 +331,8 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                 : p
         );
         await saveStoredProfiles(updated);
+        const updatedCurrent = updated.find(profile => profile.username === (editField.field === 'username' ? value : credentials?.username));
+        if (updatedCurrent) await setLastUsedProfile(updatedCurrent);
         toast.success(`${editField.label} updated`);
         setEditField(null);
     };
@@ -353,6 +361,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                         <div className="search-field-container">
                             <span className="search-icon-inside"><SearchIcon /></span>
                             <input
+                                ref={searchInputRef}
                                 autoFocus
                                 className="search-input-field"
                                 type="text"
@@ -360,6 +369,13 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                 aria-label={searchCopy.placeholder}
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
+                                enterKeyHint="search"
+                                onKeyDown={(event) => {
+                                    if (event.key === 'Enter') {
+                                        event.preventDefault();
+                                        dismissSearchKeyboard();
+                                    }
+                                }}
                             />
                         </div>
                         <button className="search-close-btn" aria-label="Close search" onClick={() => { setIsSearchActive(false); setSearchQuery(''); }}>
@@ -371,7 +387,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                         {searchQuery.length >= 2 ? (
                             searchResults.length > 0 ? (
                                 searchResults.map(item => (
-                                    <MediaCard key={item.id} item={item} onSelect={onSelectItem} onPlay={onPlay} />
+                                    <MediaCard key={item.id} item={item} onSelect={onSelectItem} onPlay={onPlay} watched={hasBeenWatched(item, history)} />
                                 ))
                             ) : (
                                 <div className="no-results">No results found for "{searchQuery}"</div>
@@ -453,7 +469,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                                 </div>
                                                 <div className="category-slider">
                                                     {continueWatching.map(item => (
-                                                        <MediaCard key={`continue-${item.id}`} item={item} onSelect={onSelectItem} onPlay={onPlay} showProgress={true} />
+                                                        <MediaCard key={`continue-${item.id}`} item={item} onSelect={onSelectItem} onPlay={onPlay} showProgress watched={hasBeenWatched(item, history)} />
                                                     ))}
                                                 </div>
                                             </div>
@@ -476,7 +492,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                         {history.length > 0 ? (
                                             <div className="category-slider">
                                                 {history.map(item => (
-                                                    <MediaCard key={`hist-${item.id}`} item={item} onSelect={onSelectItem} />
+                                                    <MediaCard key={`hist-${item.id}`} item={item} onSelect={onSelectItem} watched={hasBeenWatched(item, history)} />
                                                 ))}
                                             </div>
                                         ) : (
@@ -495,7 +511,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                         {favorites.length > 0 ? (
                                             <div className="category-slider">
                                                 {favorites.map(item => (
-                                                    <MediaCard key={item.id} item={item} onSelect={onSelectItem} />
+                                                    <MediaCard key={item.id} item={item} onSelect={onSelectItem} watched={hasBeenWatched(item, history)} />
                                                 ))}
                                             </div>
                                         ) : (
@@ -528,7 +544,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                             </div>
                                             <div className="category-slider">
                                                 {cat.items.map(item => (
-                                                    <MediaCard key={item.id} item={item} onSelect={onSelectItem} />
+                                                    <MediaCard key={item.id} item={item} onSelect={onSelectItem} watched={hasBeenWatched(item, history)} />
                                                 ))}
                                             </div>
                                         </div>
@@ -584,15 +600,36 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                     </div>
                                 </div>
                             ) : (
-                                <div className={`category-grid grid-${activeTab}`}>
-                                    {sortedStreams.length > 0 ? (
-                                        sortedStreams.map(item => (
-                                            <MediaCard key={item.id} item={item} onSelect={onSelectItem} />
-                                        ))
-                                    ) : (
-                                        <div className="no-results">No content available in this category</div>
+                                <>
+                                    {tabHistory.length > 0 && (
+                                        <section className="category-section tab-history-section" aria-label="Last watched and continue watching">
+                                            <div className="category-header">
+                                                <span className="category-title">{activeTab === 'live' ? 'Last Watched' : 'Continue Watching'}</span>
+                                            </div>
+                                            <div className="category-slider">
+                                                {tabHistory.map(item => (
+                                                    <MediaCard
+                                                        key={`tab-history-${item.id}`}
+                                                        item={item}
+                                                        onSelect={onSelectItem}
+                                                        onPlay={onPlay}
+                                                        showProgress={activeTab !== 'live'}
+                                                        watched={hasBeenWatched(item, history)}
+                                                    />
+                                                ))}
+                                            </div>
+                                        </section>
                                     )}
-                                </div>
+                                    <div className={`category-grid grid-${activeTab}`}>
+                                        {sortedStreams.length > 0 ? (
+                                            sortedStreams.map(item => (
+                                                <MediaCard key={item.id} item={item} onSelect={onSelectItem} watched={hasBeenWatched(item, history)} />
+                                            ))
+                                        ) : (
+                                            <div className="no-results">No content available in this category</div>
+                                        )}
+                                    </div>
+                                </>
                             )}
                         </div>
                     )}

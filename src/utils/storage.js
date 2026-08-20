@@ -4,6 +4,12 @@
  */
 
 const PROFILES_KEY = 'aura_profiles';
+const LAST_USED_PROFILE_KEY = 'aura_last_used_profile';
+
+export const getProfileId = (profile) => {
+    if (!profile?.url || !profile?.username) return null;
+    return `${profile.url.trim()}::${profile.username.trim()}`;
+};
 
 /**
  * Get stored profiles
@@ -44,14 +50,32 @@ export const addProfile = async (newProfile) => {
     await saveStoredProfiles(updated);
 };
 
+/** Remember which account should be connected automatically on a cold start. */
+export const setLastUsedProfile = async (profile) => {
+    const id = getProfileId(profile);
+    if (id) localStorage.setItem(LAST_USED_PROFILE_KEY, id);
+};
+
+/** Resolve the last-used account against the current saved profiles. */
+export const getLastUsedProfile = async (profiles = null) => {
+    const id = localStorage.getItem(LAST_USED_PROFILE_KEY);
+    if (!id) return null;
+    const availableProfiles = profiles || await getStoredProfiles();
+    return availableProfiles.find(profile => getProfileId(profile) === id) || null;
+};
+
 /**
  * Delete a profile by index
  * @param {number} index - Index of profile to delete
  */
 export const deleteProfile = async (index) => {
     const profiles = await getStoredProfiles();
+    const removedProfile = profiles[index];
     const updated = profiles.filter((_, i) => i !== index);
     await saveStoredProfiles(updated);
+    if (getProfileId(removedProfile) === localStorage.getItem(LAST_USED_PROFILE_KEY)) {
+        localStorage.removeItem(LAST_USED_PROFILE_KEY);
+    }
 };
 
 /**
