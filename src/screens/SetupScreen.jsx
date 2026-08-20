@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import './SetupScreen.css';
 import { xtreamApi } from '../services/xtream';
 import { toast } from '../components/Toast';
-import { getStoredProfiles, addProfile, deleteProfile as removeProfile, getDecryptedProfile, migrateToEncrypted } from '../utils/storage';
+import { addProfile, deleteProfile as removeProfile, getDecryptedProfile, getLastUsedProfile, getStoredProfiles, migrateToEncrypted, setLastUsedProfile } from '../utils/storage';
 
 const GlobeIcon = () => (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -31,7 +31,7 @@ const TrashIcon = () => (
     </svg>
 );
 
-export default function SetupScreen({ onConnect }) {
+export default function SetupScreen({ onConnect, autoLogin = true }) {
     const [url, setUrl] = useState(import.meta.env.VITE_XTREAM_URL || '');
     const [username, setUsername] = useState(import.meta.env.VITE_XTREAM_USER || '');
     const [password, setPassword] = useState(import.meta.env.VITE_XTREAM_PASS || '');
@@ -39,25 +39,57 @@ export default function SetupScreen({ onConnect }) {
 
     // Profiles state
     const [profiles, setProfiles] = useState([]);
+    const autoLoginAttempted = useRef(false);
+
+    const connectWithCredentials = useCallback(async (creds) => {
+        if (!creds?.url || !creds?.username || !creds?.password) return false;
+
+        setLoading(true);
+        try {
+            const res = creds.url === 'demo'
+                ? { success: true }
+                : await xtreamApi.authenticate(creds.url, creds.username, creds.password);
+            if (!res.success) {
+                toast.error(res.error || 'Connection Failed');
+                return false;
+            }
+
+            await addProfile(creds);
+            await setLastUsedProfile(creds);
+            onConnect(creds);
+            return true;
+        } catch (_err) {
+            toast.error('Error connecting to provider');
+            return false;
+        } finally {
+            setLoading(false);
+        }
+    }, [onConnect]);
 
     // Load profiles with migration on startup
     useEffect(() => {
+        let cancelled = false;
         const loadProfiles = async () => {
             await migrateToEncrypted(); // Migrate if needed
             const stored = await getStoredProfiles();
+            if (cancelled) return;
             setProfiles(stored);
+
+            if (autoLogin && !autoLoginAttempted.current) {
+                autoLoginAttempted.current = true;
+                const lastUsed = await getLastUsedProfile(stored);
+                if (lastUsed && !cancelled) {
+                    const decrypted = await getDecryptedProfile(lastUsed);
+                    setUrl(decrypted.url);
+                    setUsername(decrypted.username);
+                    setPassword(decrypted.password || '');
+                    await connectWithCredentials(decrypted);
+                }
+            }
         };
         loadProfiles();
-    }, []);
-
-    const saveProfile = async (newCreds) => {
-        const existing = profiles.find(p => p.url === newCreds.url && p.username === newCreds.username);
-        if (existing) return;
-
-        await addProfile(newCreds);
-        const updated = await getStoredProfiles();
-        setProfiles(updated);
-    };
+        return () => { cancelled = true; };
+    }, [autoLogin, connectWithCredentials]);
 
     const deleteProfile = async (e, index) => {
         e.stopPropagation();
@@ -72,27 +104,14 @@ export default function SetupScreen({ onConnect }) {
         setUrl(decrypted.url);
         setUsername(decrypted.username);
         setPassword(decrypted.password || '');
+        await connectWithCredentials(decrypted);
     };
 
     const handleConnect = async (e) => {
         if (e) e.preventDefault();
         if (!url || !username || !password) return;
 
-        setLoading(true);
-        try {
-            const res = await xtreamApi.authenticate(url, username, password);
-            if (res.success) {
-                const creds = { url, username, password };
-                saveProfile(creds);
-                onConnect(creds);
-            } else {
-                toast.error(res.error || 'Connection Failed');
-            }
-        } catch (_err) {
-            toast.error('Error connecting to provider');
-        } finally {
-            setLoading(false);
-        }
+        await connectWithCredentials({ url, username, password });
     };
 
     return (
@@ -203,7 +222,7 @@ export default function SetupScreen({ onConnect }) {
                     className="btn-ghost"
                     type="button"
                     style={{ width: '100%' }}
-                    onClick={() => onConnect({ url: 'demo', username: 'demo', password: 'demo' })}
+                    onClick={() => connectWithCredentials({ url: 'demo', username: 'demo', password: 'demo' })}
                 >
                     Try with Demo Content
                 </button>

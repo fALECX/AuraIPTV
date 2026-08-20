@@ -14,7 +14,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 52px 20px 0;
+    padding: max(18px, env(safe-area-inset-top)) 20px 0;
     flex-shrink: 0;
 }
 
@@ -119,9 +119,10 @@
 }
 
 .featured-hero-badge {
+    display: inline-flex;
     position: absolute;
     top: 12px;
-    left: 12px;
+    right: 12px;
     background: var(--accent);
     color: #fff;
     font-size: 10px;
@@ -130,6 +131,7 @@
     text-transform: uppercase;
     padding: 4px 10px;
     border-radius: 20px;
+    margin-bottom: 0;
 }
 
 .featured-hero-content {
@@ -285,6 +287,24 @@
     background: linear-gradient(90deg, #4f7dff, #8b5cf6);
     border-radius: 0 0 0 0;
     transition: width 0.3s ease;
+}
+
+.media-card-watched-badge {
+    position: absolute;
+    top: 7px;
+    right: 7px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #10b981;
+    color: #fff;
+    border: 2px solid rgba(8, 9, 13, 0.9);
+    font-size: 12px;
+    font-weight: 900;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .live-dot {
@@ -458,7 +478,7 @@
 }
 
 .search-input-wrapper {
-    padding: 60px 20px 20px;
+    padding: max(18px, env(safe-area-inset-top)) 20px 20px;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -755,8 +775,7 @@
 .filter-overlay-backdrop {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(4px);
+    background: #08090d;
     z-index: 1000;
     display: flex;
     align-items: flex-end;
@@ -776,7 +795,8 @@
 .filter-overlay-content {
     width: 100%;
     max-height: 80vh;
-    background: var(--bg-card);
+    background: #141722;
+    opacity: 1;
     border-top: 1px solid var(--glass-border);
     border-radius: 24px 24px 0 0;
     display: flex;

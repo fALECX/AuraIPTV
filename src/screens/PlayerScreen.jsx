@@ -3,6 +3,7 @@ import { toast } from '../components/Toast';
 import { useHlsPlayer } from '../hooks/useHlsPlayer';
 import { getPlaybackSources } from '../services/playback';
 import { canUseNativeAndroidPlayer, openNativeAndroidPlayer } from '../services/nativePlayer';
+import { clearWatchProgress, getWatchProgress, markAsWatched, saveWatchProgress } from '../utils/watchProgress';
 import './PlayerScreen.css';
 
 const BackIcon = () => (
@@ -32,7 +33,14 @@ function formatTime(s) {
     return h > 0 ? `${h}:${m}:${ss}` : `${m}:${ss}`;
 }
 
-const POSITION_KEY = (item) => item ? `aura_pos_${item.id}` : null;
+const getInitialStartDecision = (item) => {
+    const savedPosition = item?.type === 'live' ? 0 : (getWatchProgress(item) || 0);
+    return {
+        itemId: item?.id,
+        status: savedPosition > 10 && !item?.autoResume ? 'prompt' : 'ready',
+        position: savedPosition > 10 ? savedPosition : 0,
+    };
+};
 
 export default function PlayerScreen({ item, onBack, onPlayNext }) {
     const [playing, setPlaying] = useState(true);
@@ -57,8 +65,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
     const [volume, setVolume] = useState(1);
     const [muted, setMuted] = useState(false);
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [showResumePrompt, setShowResumePrompt] = useState(false);
-    const [resumePosition, setResumePosition] = useState(0);
+    const [startDecision, setStartDecision] = useState(() => getInitialStartDecision(item));
     const [showNextCountdown, setShowNextCountdown] = useState(false);
     const [nextCountdown, setNextCountdown] = useState(5);
     const [isBuffering, setIsBuffering] = useState(false);
@@ -77,6 +84,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
     const sleepTimerRef = useRef(null);
     const wakeLockRef = useRef(null);
     const nativeLaunchRef = useRef(null);
+    const appliedStartRef = useRef(null);
     const onBackRef = useRef(onBack);
     const onPlayNextRef = useRef(onPlayNext);
 
@@ -98,6 +106,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
     const positionKey = itemId ? `aura_pos_${itemId}` : null;
     const streamUrl = transcodeFallback ? playbackSources.compatible : playbackSources.original;
     const shouldUseNativePlayer = canUseNativeAndroidPlayer() && !nativePlayerFailed;
+    const startIsReady = startDecision.itemId === itemId && startDecision.status === 'ready';
 
     const handlePlaybackFailure = useCallback((detail = '') => {
         setIsBuffering(false);
@@ -128,35 +137,35 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
             const settings = JSON.parse(localStorage.getItem('aura_player_settings') || '{}');
             preferCompatible = itemType !== 'live' && settings.preferredQuality === 'transcoded';
         } catch { /* use original source */ }
-        setPlaying(true);
         setTranscodeFallback(preferCompatible);
         setStreamError(false);
         setErrorDetail('');
-        setIsBuffering(true);
         setNativePlayerFailed(false);
         nativeLaunchRef.current = null;
-    }, [itemId, itemType]);
-
-    // Check for saved position and offer resume
-    useEffect(() => {
-        if (!positionKey || itemType === 'live') return;
-        const saved = parseFloat(localStorage.getItem(positionKey));
-        if (saved && saved > 10) {
-            setResumePosition(saved);
-            setShowResumePrompt(true);
-        }
-    }, [itemType, positionKey]);
+        appliedStartRef.current = null;
+        const nextDecision = getInitialStartDecision(item);
+        setStartDecision(nextDecision);
+        setPlaying(nextDecision.status === 'ready');
+        setIsBuffering(nextDecision.status === 'ready');
+    }, [item, itemId, itemType]);
 
     // Save playback position every 5 seconds
     useEffect(() => {
         if (!positionKey || itemType === 'live') return;
         positionSaveRef.current = setInterval(() => {
             if (videoRef.current && videoRef.current.currentTime > 5) {
-                localStorage.setItem(positionKey, videoRef.current.currentTime.toString());
+                saveWatchProgress(item, videoRef.current.currentTime, videoRef.current.duration);
             }
         }, 5000);
         return () => clearInterval(positionSaveRef.current);
-    }, [itemType, positionKey]);
+    }, [item, itemType, positionKey]);
+
+    useEffect(() => () => {
+        const video = videoRef.current;
+        if (itemType !== 'live' && video?.currentTime > 5) {
+            saveWatchProgress(item, video.currentTime, video.duration);
+        }
+    }, [item, itemType]);
 
     // Buffering detection
     useEffect(() => {
@@ -319,7 +328,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
 
     // Play / Pause
     useEffect(() => {
-        if (!shouldUseNativePlayer && videoRef.current && !streamError) {
+        if (startIsReady && !shouldUseNativePlayer && videoRef.current && !streamError) {
             if (playing) {
                 videoRef.current.play().catch(e => {
                     console.warn('Autoplay prevented:', e);
@@ -329,7 +338,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
                 videoRef.current.pause();
             }
         }
-    }, [playing, shouldUseNativePlayer, streamError, streamUrl]);
+    }, [playing, shouldUseNativePlayer, startIsReady, streamError, streamUrl]);
 
     // Volume sync
     useEffect(() => {
@@ -350,8 +359,10 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
 
     const handleEnded = () => {
         setPlaying(false);
-        // Clear saved position on finish
-        if (item) localStorage.removeItem(POSITION_KEY(item));
+        if (item) {
+            markAsWatched(item, videoRef.current?.duration || duration);
+            clearWatchProgress(item);
+        }
         // Offer auto-play next if callback provided
         if (onPlayNext) {
             setShowNextCountdown(true);
@@ -362,32 +373,29 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
     // Android playback runs in a native Media3 activity so MKV/HEVC and HLS are
     // handled by the device media stack rather than the more limited WebView.
     useEffect(() => {
-        if (!shouldUseNativePlayer || !item?.id || nativeLaunchRef.current === item.id) return;
+        if (!shouldUseNativePlayer || !startIsReady || !item?.id || nativeLaunchRef.current === item.id) return;
 
         let cancelled = false;
         nativeLaunchRef.current = item.id;
         setIsBuffering(true);
-
-        const savedPosition = itemType === 'live'
-            ? 0
-            : Math.max(0, Number.parseFloat(localStorage.getItem(positionKey)) || 0);
 
         openNativeAndroidPlayer({
             urls: playbackSources.nativeCandidates,
             title: item.title || '',
             subtitle: [item.genre, item.year].filter(Boolean).join(' · '),
             isLive: itemType === 'live',
-            startPositionMs: Math.round(savedPosition * 1000),
+            startPositionMs: Math.round((itemType === 'live' ? 0 : startDecision.position) * 1000),
         }).then((result) => {
             if (cancelled) return;
             setIsBuffering(false);
 
             if (itemType !== 'live' && result?.positionMs > 5000) {
-                localStorage.setItem(positionKey, String(result.positionMs / 1000));
+                saveWatchProgress(item, result.positionMs / 1000, result.durationMs / 1000);
             }
 
             if (result?.ended) {
-                localStorage.removeItem(positionKey);
+                markAsWatched(item, result.durationMs / 1000);
+                clearWatchProgress(item);
                 setPlaying(false);
                 if (onPlayNextRef.current) onPlayNextRef.current();
                 else onBackRef.current({ keepPlaying: false });
@@ -414,7 +422,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
         });
 
         return () => { cancelled = true; };
-    }, [item?.genre, item?.id, item?.title, item?.type, item?.year, itemId, itemType, playbackSources.nativeCandidates, positionKey, shouldUseNativePlayer]);
+    }, [item, item?.genre, item?.id, item?.title, item?.type, item?.year, itemId, itemType, playbackSources.nativeCandidates, shouldUseNativePlayer, startDecision.position, startIsReady]);
 
     // Auto-next countdown
     useEffect(() => {
@@ -542,13 +550,18 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
             <video
                 ref={videoRef}
                 className="player-video-bg"
-                autoPlay={!shouldUseNativePlayer}
+                autoPlay={!shouldUseNativePlayer && startIsReady}
                 playsInline
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={() => {
                     if (videoRef.current) {
                         videoRef.current.volume = volume;
                         videoRef.current.playbackRate = playbackSpeed;
+                        if (startIsReady && appliedStartRef.current !== itemId) {
+                            videoRef.current.currentTime = startDecision.position;
+                            appliedStartRef.current = itemId;
+                            if (playing) videoRef.current.play().catch(() => {});
+                        }
                     }
                 }}
                 onEnded={handleEnded}
@@ -611,7 +624,7 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
             )}
 
             {/* Resume prompt */}
-            {showResumePrompt && (
+            {startDecision.itemId === itemId && startDecision.status === 'prompt' && (
                 <div style={{
                     position: 'absolute', bottom: 100, left: '50%', transform: 'translateX(-50%)',
                     background: 'rgba(18,20,30,0.95)', border: '1px solid rgba(255,255,255,0.15)',
@@ -620,17 +633,23 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
                     WebkitBackdropFilter: 'blur(20px)',
                 }}>
                     <div style={{ fontSize: 14, color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>
-                        Resume from {formatTime(resumePosition)}?
+                        Resume from {formatTime(startDecision.position)}?
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
                         <button onClick={() => {
-                            if (videoRef.current) videoRef.current.currentTime = resumePosition;
-                            setShowResumePrompt(false);
+                            setStartDecision(current => ({ ...current, status: 'ready' }));
+                            setPlaying(true);
+                            setIsBuffering(true);
                         }} style={{
                             flex: 1, padding: '10px', borderRadius: 10, background: '#4f7dff',
                             border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
                         }}>Resume</button>
-                        <button onClick={() => setShowResumePrompt(false)} style={{
+                        <button onClick={() => {
+                            clearWatchProgress(item);
+                            setStartDecision(current => ({ ...current, status: 'ready', position: 0 }));
+                            setPlaying(true);
+                            setIsBuffering(true);
+                        }} style={{
                             flex: 1, padding: '10px', borderRadius: 10, background: 'rgba(255,255,255,0.1)',
                             border: '1px solid rgba(255,255,255,0.15)', color: 'rgba(255,255,255,0.7)',
                             fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',

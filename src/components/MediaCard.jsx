@@ -3,9 +3,9 @@ import { useRef } from 'react';
 const DRAG_THRESHOLD_PX = 10;
 const CLICK_SUPPRESSION_MS = 600;
 
-export default function MediaCard({ item, onSelect, onPlay, showProgress = false }) {
-    const progress = showProgress && item.watchPosition
-        ? (item.watchPosition / (item.duration || 3600)) * 100
+export default function MediaCard({ item, onSelect, onPlay, showProgress = false, watched = false }) {
+    const progress = showProgress
+        ? (item.progressPercentage ?? (item.watchPosition && item.watchDuration ? (item.watchPosition / item.watchDuration) * 100 : null))
         : null;
     const longPressTimeout = useRef(null);
     const gesture = useRef(null);
@@ -61,6 +61,11 @@ export default function MediaCard({ item, onSelect, onPlay, showProgress = false
         gesture.current = null;
     };
 
+    const cancelGesture = () => {
+        if (gesture.current) suppressClickUntil.current = Date.now() + CLICK_SUPPRESSION_MS;
+        finishGesture();
+    };
+
     const handleClick = (event) => {
         if (Date.now() < suppressClickUntil.current) {
             event.preventDefault();
@@ -83,8 +88,8 @@ export default function MediaCard({ item, onSelect, onPlay, showProgress = false
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={finishGesture}
-            onPointerCancel={finishGesture}
-            onLostPointerCapture={finishGesture}
+            onPointerCancel={cancelGesture}
+            onLostPointerCapture={cancelGesture}
         >
             <div className="media-card-img-wrap">
                 <img
@@ -101,6 +106,9 @@ export default function MediaCard({ item, onSelect, onPlay, showProgress = false
                     <div className="media-card-live-badge">
                         <span className="live-dot" /> LIVE
                     </div>
+                )}
+                {(watched || item.watched) && item.type !== 'live' && (
+                    <div className="media-card-watched-badge" aria-label="Watched" title="Watched">&#10003;</div>
                 )}
                 {progress !== null && (
                     <div className="media-card-progress" style={{ width: `${Math.min(progress, 100)}%` }} />

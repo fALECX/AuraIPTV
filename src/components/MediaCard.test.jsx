@@ -22,4 +22,19 @@ describe('MediaCard touch gestures', () => {
         fireEvent.click(card);
         expect(onSelect).not.toHaveBeenCalled();
     });
+
+    it('does not open content after Android cancels a pointer during scrolling', () => {
+        const onSelect = vi.fn();
+        render(<MediaCard item={item} onSelect={onSelect} />);
+        const card = screen.getByRole('button', { name: 'Test Movie' });
+        fireEvent.pointerDown(card, { pointerType: 'touch', clientX: 20, clientY: 20 });
+        fireEvent.pointerCancel(card, { pointerType: 'touch' });
+        fireEvent.click(card);
+        expect(onSelect).not.toHaveBeenCalled();
+    });
+
+    it('renders a compact watched marker', () => {
+        render(<MediaCard item={item} watched onSelect={vi.fn()} />);
+        expect(screen.getByLabelText('Watched')).toBeVisible();
+    });
 });

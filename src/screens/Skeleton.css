@@ -84,6 +84,39 @@
     transition: opacity 0.2s;
 }
 
+.episode-watched-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #10b981;
+    color: #fff;
+    border: 2px solid rgba(8, 9, 13, 0.9);
+    font-size: 12px;
+    font-weight: 900;
+    z-index: 2;
+}
+
+.episode-progress-track {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.25);
+    z-index: 2;
+}
+
+.episode-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4f7dff, #8b5cf6);
+}
+
 .episode-card:hover .episode-play-overlay {
     opacity: 1;
 }
@@ -143,4 +176,17 @@
     height: 24px;
     width: 60%;
     margin-bottom: 12px;
+}
+
+.episode-status {
+    display: inline-block;
+    width: fit-content;
+    margin: 1px 0 3px;
+    color: #8ba8ff;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.episode-status.watched {
+    color: #34d399;
 }

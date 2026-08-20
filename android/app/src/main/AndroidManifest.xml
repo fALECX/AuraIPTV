@@ -25,6 +25,8 @@
         <activity
             android:name=".NativePlayerActivity"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|uiMode"
+            android:supportsPictureInPicture="true"
+            android:resizeableActivity="true"
             android:exported="false"
             android:theme="@style/AppTheme.NoActionBar" />
 

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useHlsPlayer } from '../hooks/useHlsPlayer';
 import { getPlaybackSources } from '../services/playback';
+import { clearWatchProgress, getWatchProgress, markAsWatched, saveWatchProgress } from '../utils/watchProgress';
 import './MiniPlayer.css';
 
-export default function MiniPlayer({ item, onExpand, onClose }) {
+export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
     const [playing, setPlaying] = useState(true);
     const [progress, setProgress] = useState(0);
     const [isDragging, setIsDragging] = useState(false);
@@ -11,6 +12,7 @@ export default function MiniPlayer({ item, onExpand, onClose }) {
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [useCompatibleSource, setUseCompatibleSource] = useState(false);
     const videoRef = useRef(null);
+    const lastProgressSaveRef = useRef(0);
 
     const playbackSources = useMemo(() => getPlaybackSources({
         stream_id: item?.stream_id,
@@ -33,6 +35,13 @@ export default function MiniPlayer({ item, onExpand, onClose }) {
 
     useEffect(() => setUseCompatibleSource(false), [item?.id]);
 
+    useEffect(() => () => {
+        const video = videoRef.current;
+        if (item?.type !== 'live' && video?.currentTime > 5) {
+            saveWatchProgress(item, video.currentTime, video.duration);
+        }
+    }, [item]);
+
     useEffect(() => {
         if (videoRef.current && playing) {
             videoRef.current.play().catch(() => { });
@@ -45,6 +54,10 @@ export default function MiniPlayer({ item, onExpand, onClose }) {
         const total = videoRef.current.duration;
         if (total > 0) {
             setProgress((current / total) * 100);
+            if (item.type !== 'live' && current - lastProgressSaveRef.current >= 5) {
+                saveWatchProgress(item, current, total);
+                lastProgressSaveRef.current = current;
+            }
         }
     };
 
@@ -131,6 +144,16 @@ export default function MiniPlayer({ item, onExpand, onClose }) {
                 playsInline
                 muted
                 onTimeUpdate={handleTimeUpdate}
+                onLoadedMetadata={() => {
+                    const saved = getWatchProgress(item);
+                    if (videoRef.current && saved > 10) videoRef.current.currentTime = saved;
+                }}
+                onEnded={() => {
+                    markAsWatched(item, videoRef.current?.duration);
+                    clearWatchProgress(item);
+                    setPlaying(false);
+                    onPlayNext?.();
+                }}
                 onError={handlePlaybackError}
                 onClick={(e) => { e.stopPropagation(); onExpand(); }}
             />
