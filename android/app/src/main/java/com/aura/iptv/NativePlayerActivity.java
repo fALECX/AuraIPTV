@@ -1,7 +1,13 @@
 package com.aura.iptv;
 
 import android.app.Activity;
+import android.app.PendingIntent;
 import android.app.PictureInPictureParams;
+import android.app.RemoteAction;
+import android.content.BroadcastReceiver;
+import android.content.Context;
+import android.content.IntentFilter;
+import android.graphics.drawable.Icon;
 import android.content.res.Configuration;
 import android.content.Intent;
 import android.graphics.Color;
@@ -43,6 +49,14 @@ public class NativePlayerActivity extends AppCompatActivity {
     public static final String EXTRA_SUBTITLE = "subtitle";
     public static final String EXTRA_IS_LIVE = "isLive";
     public static final String EXTRA_START_POSITION_MS = "startPositionMs";
+    public static final String EXTRA_HAS_PREV = "hasPrev";
+    public static final String EXTRA_HAS_NEXT = "hasNext";
+    public static final String RESULT_NAVIGATE = "navigate";
+
+    private static final String ACTION_PIP_CONTROL = "com.aura.iptv.PIP_CONTROL";
+    private static final String EXTRA_PIP_COMMAND = "command";
+    private static final int PIP_TOGGLE_PLAY = 1;
+    private static final int PIP_TOGGLE_MUTE = 2;
 
     public static final String RESULT_ENDED = "ended";
     public static final String RESULT_POSITION_MS = "positionMs";
@@ -63,6 +77,24 @@ public class NativePlayerActivity extends AppCompatActivity {
     private boolean isLive = false;
     private boolean finishedWithResult = false;
     private String lastError;
+    private String navigateDirection;
+    private boolean muted = false;
+    private LinearLayout channelNav;
+    private final BroadcastReceiver pipReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (player == null || intent == null) return;
+            int command = intent.getIntExtra(EXTRA_PIP_COMMAND, 0);
+            if (command == PIP_TOGGLE_PLAY) {
+                if (player.isPlaying()) player.pause();
+                else player.play();
+            } else if (command == PIP_TOGGLE_MUTE) {
+                muted = !muted;
+                player.setVolume(muted ? 0f : 1f);
+            }
+            updatePipActions();
+        }
+    };
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -166,6 +198,23 @@ public class NativePlayerActivity extends AppCompatActivity {
         );
         root.addView(header, headerParams);
 
+        boolean hasPrev = getIntent().getBooleanExtra(EXTRA_HAS_PREV, false);
+        boolean hasNext = getIntent().getBooleanExtra(EXTRA_HAS_NEXT, false);
+        if (hasPrev || hasNext) {
+            channelNav = new LinearLayout(this);
+            channelNav.setOrientation(LinearLayout.HORIZONTAL);
+            channelNav.setGravity(Gravity.CENTER_VERTICAL);
+            channelNav.setPadding(dp(8), 0, dp(8), 0);
+            channelNav.addView(channelButton("⏮", "Previous channel", hasPrev, "prev"));
+            channelNav.addView(new View(this), new LinearLayout.LayoutParams(0, 1, 1f));
+            channelNav.addView(channelButton("⏭", "Next channel", hasNext, "next"));
+            root.addView(channelNav, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                Gravity.CENTER_VERTICAL
+            ));
+        }
+
         errorPanel = new LinearLayout(this);
         errorPanel.setOrientation(LinearLayout.VERTICAL);
         errorPanel.setGravity(Gravity.CENTER);
@@ -223,6 +272,24 @@ public class NativePlayerActivity extends AppCompatActivity {
         setContentView(root);
     }
 
+    private Button channelButton(String label, String description, boolean enabled, String direction) {
+        Button button = new Button(this);
+        button.setText(label);
+        button.setTextSize(22);
+        button.setTextColor(Color.WHITE);
+        button.setContentDescription(description);
+        button.setBackgroundColor(0x66000000);
+        button.setMinWidth(dp(56));
+        button.setMinHeight(dp(56));
+        button.setVisibility(enabled ? View.VISIBLE : View.INVISIBLE);
+        button.setOnClickListener(view -> {
+            navigateDirection = direction;
+            finishWithResult(false, null);
+        });
+        button.setLayoutParams(new LinearLayout.LayoutParams(dp(64), dp(64)));
+        return button;
+    }
+
     private void initializePlayer() {
         DefaultHttpDataSource.Factory httpFactory = new DefaultHttpDataSource.Factory()
             .setUserAgent("AuraIPTV (Android Media3)")
@@ -251,6 +318,11 @@ public class NativePlayerActivity extends AppCompatActivity {
                     lastError += ": " + error.getMessage();
                 }
                 showPlaybackError(lastError);
+            }
+
+            @Override
+            public void onIsPlayingChanged(boolean isPlaying) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isInPictureInPictureMode()) updatePipActions();
             }
 
             @Override
@@ -291,6 +363,7 @@ public class NativePlayerActivity extends AppCompatActivity {
         data.putExtra(RESULT_DURATION_MS, lastDurationMs);
         data.putExtra(RESULT_USED_FALLBACK, sourceIndex > 0);
         if (error != null && !error.trim().isEmpty()) data.putExtra(RESULT_ERROR, error);
+        if (navigateDirection != null) data.putExtra(RESULT_NAVIGATE, navigateDirection);
         setResult(ended ? Activity.RESULT_OK : Activity.RESULT_CANCELED, data);
         finish();
     }
@@ -312,14 +385,56 @@ public class NativePlayerActivity extends AppCompatActivity {
         }
         PictureInPictureParams params = new PictureInPictureParams.Builder()
             .setAspectRatio(new Rational(width, height))
+            .setActions(buildPipActions())
             .build();
         enterPictureInPictureMode(params);
+    }
+
+    // PiP overlay controls: mute first, play/pause second. The system draws the
+    // close button (top right) and lays out these actions itself.
+    private ArrayList<RemoteAction> buildPipActions() {
+        ArrayList<RemoteAction> actions = new ArrayList<>();
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return actions;
+        actions.add(pipAction(
+            muted ? android.R.drawable.ic_lock_silent_mode : android.R.drawable.ic_lock_silent_mode_off,
+            muted ? "Unmute" : "Mute",
+            PIP_TOGGLE_MUTE
+        ));
+        boolean playing = player != null && player.getPlayWhenReady();
+        actions.add(pipAction(
+            playing ? android.R.drawable.ic_media_pause : android.R.drawable.ic_media_play,
+            playing ? "Pause" : "Play",
+            PIP_TOGGLE_PLAY
+        ));
+        return actions;
+    }
+
+    private RemoteAction pipAction(int iconRes, String title, int command) {
+        Intent intent = new Intent(ACTION_PIP_CONTROL).setPackage(getPackageName()).putExtra(EXTRA_PIP_COMMAND, command);
+        PendingIntent pending = PendingIntent.getBroadcast(this, command, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+        return new RemoteAction(Icon.createWithResource(this, iconRes), title, title, pending);
+    }
+
+    private void updatePipActions() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return;
+        setPictureInPictureParams(new PictureInPictureParams.Builder().setActions(buildPipActions()).build());
     }
 
     @Override
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode, Configuration newConfig) {
         super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig);
         if (header != null) header.setVisibility(isInPictureInPictureMode ? View.GONE : View.VISIBLE);
+        if (channelNav != null) channelNav.setVisibility(isInPictureInPictureMode ? View.GONE : View.VISIBLE);
+        if (isInPictureInPictureMode) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                registerReceiver(pipReceiver, new IntentFilter(ACTION_PIP_CONTROL), Context.RECEIVER_NOT_EXPORTED);
+            } else {
+                registerReceiver(pipReceiver, new IntentFilter(ACTION_PIP_CONTROL));
+            }
+        } else {
+            try { unregisterReceiver(pipReceiver); } catch (IllegalArgumentException ignored) { }
+        }
         if (playerView != null) playerView.setUseController(!isInPictureInPictureMode);
     }
 
@@ -344,6 +459,7 @@ public class NativePlayerActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         capturePlayerState();
+        try { unregisterReceiver(pipReceiver); } catch (IllegalArgumentException ignored) { }
         if (playerView != null) playerView.setPlayer(null);
         if (player != null) {
             player.release();

@@ -21,6 +21,10 @@ export default function App() {
   const [playNextFn, setPlayNextFn] = useState(null);
   const [showMiniPlayer, setShowMiniPlayer] = useState(false);
   const [allowStartupAutoLogin, setAllowStartupAutoLogin] = useState(true);
+  // Search state lives here so it survives Home -> Detail -> Player -> back
+  const [homeSearch, setHomeSearch] = useState({ active: false, query: '' });
+  // Ordered list of live channels the user picked from (search results or category grid)
+  const [channelList, setChannelList] = useState([]);
 
   useEffect(() => {
     const onOnline = () => setIsOnline(true);
@@ -85,16 +89,29 @@ export default function App() {
     CapacitorApp.addListener('backButton', () => {
       if (screen === 'player') goBack({ keepPlaying: false });
       else if (screen === 'detail') setScreen('home');
+      else if (screen === 'home' && homeSearch.active) setHomeSearch({ active: false, query: '' });
       else if (screen === 'home' && activeTab !== 'home') setActiveTab('home');
       else CapacitorApp.minimizeApp();
     }).then(handle => { listener = handle; });
 
     return () => { listener?.remove(); };
-  }, [activeTab, goBack, screen]);
+  }, [activeTab, goBack, homeSearch.active, screen]);
+
+  const channelIndex = playingItem?.type === 'live'
+    ? channelList.findIndex(c => c.id === playingItem.id)
+    : -1;
+  const switchChannel = (offset) => {
+    if (channelIndex < 0 || channelList.length < 2) return;
+    const next = channelList[(channelIndex + offset + channelList.length) % channelList.length];
+    goPlayer(next);
+  };
+  const hasChannelNav = channelIndex >= 0 && channelList.length > 1;
 
   const handleLogout = () => {
     setCredentials(null);
     setAllowStartupAutoLogin(false);
+    setHomeSearch({ active: false, query: '' });
+    setChannelList([]);
     setScreen('setup');
   };
 
@@ -139,6 +156,9 @@ export default function App() {
             setSelectedCategoryIds={setSelectedCategoryIds}
             onLogout={handleLogout}
             onUpdateCredentials={handleUpdateCredentials}
+            search={homeSearch}
+            onSearchChange={setHomeSearch}
+            onChannelContext={setChannelList}
             key="home"
           />
         )}
@@ -157,6 +177,8 @@ export default function App() {
             item={playingItem}
             onBack={goBack}
             onPlayNext={playNextFn}
+            onPrevChannel={hasChannelNav ? () => switchChannel(-1) : null}
+            onNextChannel={hasChannelNav ? () => switchChannel(1) : null}
             key="player"
           />
         )}

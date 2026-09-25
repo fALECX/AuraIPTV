@@ -11,6 +11,9 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
     const [position, setPosition] = useState({ x: 16, y: 100 });
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
     const [useCompatibleSource, setUseCompatibleSource] = useState(false);
+    const [muted, setMuted] = useState(false);
+    const [showControls, setShowControls] = useState(false);
+    const hideTimer = useRef(null);
     const videoRef = useRef(null);
     const lastProgressSaveRef = useRef(0);
 
@@ -44,7 +47,14 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
 
     useEffect(() => {
         if (videoRef.current && playing) {
-            videoRef.current.play().catch(() => { });
+            videoRef.current.play().catch(() => {
+                // Autoplay with sound can be blocked; fall back to muted playback
+                if (videoRef.current) {
+                    videoRef.current.muted = true;
+                    setMuted(true);
+                    videoRef.current.play().catch(() => { });
+                }
+            });
         }
     }, [playing]);
 
@@ -95,6 +105,14 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
         };
     }, [handleMouseMove, handleMouseUp]);
 
+    useEffect(() => () => clearTimeout(hideTimer.current), []);
+
+    const revealControls = () => {
+        setShowControls(true);
+        clearTimeout(hideTimer.current);
+        hideTimer.current = setTimeout(() => setShowControls(false), 3000);
+    };
+
     if (!item) return null;
 
     return (
@@ -113,28 +131,44 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
                 });
             }}
         >
-            <div className="mini-player-header">
+            <div className="mini-player-title-bar">
                 <span className="mini-player-title">{item?.title}</span>
-                <div className="mini-player-actions">
-                    <button
-                        className="mini-player-btn"
-                        onClick={(e) => { e.stopPropagation(); setPlaying(!playing); }}
-                    >
-                        {playing ? '⏸' : '▶'}
-                    </button>
-                    <button
-                        className="mini-player-btn"
-                        onClick={(e) => { e.stopPropagation(); onExpand(); }}
-                    >
-                        ⛶
-                    </button>
-                    <button
-                        className="mini-player-btn mini-player-close"
-                        onClick={(e) => { e.stopPropagation(); onClose(); }}
-                    >
-                        ✕
-                    </button>
-                </div>
+            </div>
+
+            <div className={`mini-player-controls ${showControls || !playing ? 'visible' : ''}`}>
+                <button
+                    className="mini-player-btn mini-player-expand"
+                    aria-label="Expand player"
+                    onClick={(e) => { e.stopPropagation(); onExpand(); }}
+                >
+                    ⛶
+                </button>
+                <button
+                    className="mini-player-btn mini-player-close"
+                    aria-label="Close player"
+                    onClick={(e) => { e.stopPropagation(); onClose(); }}
+                >
+                    ✕
+                </button>
+                <button
+                    className="mini-player-btn mini-player-play"
+                    aria-label={playing ? 'Pause' : 'Play'}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        if (playing) videoRef.current?.pause();
+                        setPlaying(!playing);
+                        revealControls();
+                    }}
+                >
+                    {playing ? '⏸' : '▶'}
+                </button>
+                <button
+                    className="mini-player-btn mini-player-mute"
+                    aria-label={muted ? 'Unmute' : 'Mute'}
+                    onClick={(e) => { e.stopPropagation(); setMuted(!muted); revealControls(); }}
+                >
+                    {muted ? '🔇' : '🔊'}
+                </button>
             </div>
 
             <video
@@ -142,7 +176,7 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
                 className="mini-player-video"
                 autoPlay
                 playsInline
-                muted
+                muted={muted}
                 onTimeUpdate={handleTimeUpdate}
                 onLoadedMetadata={() => {
                     const saved = getWatchProgress(item);
@@ -155,7 +189,7 @@ export default function MiniPlayer({ item, onExpand, onClose, onPlayNext }) {
                     onPlayNext?.();
                 }}
                 onError={handlePlaybackError}
-                onClick={(e) => { e.stopPropagation(); onExpand(); }}
+                onClick={(e) => { e.stopPropagation(); revealControls(); }}
             />
 
             <div

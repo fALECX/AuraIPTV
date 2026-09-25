@@ -45,6 +45,8 @@ public class NativePlayerPlugin extends Plugin {
         intent.putExtra(NativePlayerActivity.EXTRA_SUBTITLE, call.getString("subtitle", ""));
         intent.putExtra(NativePlayerActivity.EXTRA_IS_LIVE, Boolean.TRUE.equals(call.getBoolean("isLive", false)));
         intent.putExtra(NativePlayerActivity.EXTRA_START_POSITION_MS, call.getLong("startPositionMs", 0L));
+        intent.putExtra(NativePlayerActivity.EXTRA_HAS_PREV, Boolean.TRUE.equals(call.getBoolean("hasPrev", false)));
+        intent.putExtra(NativePlayerActivity.EXTRA_HAS_NEXT, Boolean.TRUE.equals(call.getBoolean("hasNext", false)));
         startActivityForResult(call, intent, "playerResult");
     }
 
@@ -60,6 +62,9 @@ public class NativePlayerPlugin extends Plugin {
         result.put("usedFallback", data != null && data.getBooleanExtra(NativePlayerActivity.RESULT_USED_FALLBACK, false));
         if (data != null && data.hasExtra(NativePlayerActivity.RESULT_ERROR)) {
             result.put("error", data.getStringExtra(NativePlayerActivity.RESULT_ERROR));
+        }
+        if (data != null && data.hasExtra(NativePlayerActivity.RESULT_NAVIGATE)) {
+            result.put("navigate", data.getStringExtra(NativePlayerActivity.RESULT_NAVIGATE));
         }
         result.put("dismissed", activityResult.getResultCode() != Activity.RESULT_OK);
         call.resolve(result);
