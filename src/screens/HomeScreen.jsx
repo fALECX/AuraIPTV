@@ -65,7 +65,9 @@ const ClockIcon = () => (
     </svg>
 );
 
-export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveTab, credentials, selectedCategoryIds, setSelectedCategoryIds, onLogout, onUpdateCredentials }) {
+const scrollMemory = new Map();
+
+export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveTab, credentials, selectedCategoryIds, setSelectedCategoryIds, onLogout, onUpdateCredentials, search, onSearchChange, onChannelContext }) {
     const [loading, setLoading] = useState(true);
     const [categories, setCategories] = useState([]);
     const [streamCategories, setStreamCategories] = useState([]);
@@ -74,8 +76,8 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
     const [history, setHistory] = useState([]);
 
     // Search & Filter State
-    const [isSearchActive, setIsSearchActive] = useState(false);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [isSearchActive, setIsSearchActive] = useState(search?.active ?? false);
+    const [searchQuery, setSearchQuery] = useState(search?.query ?? '');
     const [searchResults, setSearchResults] = useState([]);
     const [searchHistory, setSearchHistory] = useState([]);
     const [sortOrder, setSortOrder] = useState('default');
@@ -91,6 +93,31 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
 
     const rawData = useRef({ live: [], vod: [], series: [] });
     const searchInputRef = useRef(null);
+    const scrollRef = useRef(null);
+
+    // Persist search to parent so it survives navigation to detail/player
+    useEffect(() => {
+        onSearchChange?.({ active: isSearchActive, query: searchQuery });
+    }, [isSearchActive, searchQuery, onSearchChange]);
+
+    const scrollKey = `${activeTab}|${isSearchActive ? `search:${searchQuery}` : selectedCategoryIds.join(',')}`;
+    // Restore scroll position once content is rendered
+    useEffect(() => {
+        if (loading) return undefined;
+        const el = scrollRef.current;
+        const saved = scrollMemory.get(scrollKey);
+        if (!el || !saved) return undefined;
+        const frame = requestAnimationFrame(() => { el.scrollTop = saved; });
+        return () => cancelAnimationFrame(frame);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [loading, activeTab, isSearchActive, searchResults.length, streams.length]);
+    const rememberScroll = (e) => { scrollMemory.set(scrollKey, e.currentTarget.scrollTop); };
+
+    // Remember which live list a channel was picked from, for prev/next in the player
+    const withChannelContext = (handler, list) => (item) => {
+        if (item?.type === 'live') onChannelContext?.(list.filter(i => i.type === 'live'));
+        handler?.(item);
+    };
 
     // Load initial home data & Favorites
     useEffect(() => {
@@ -254,6 +281,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
     // Debounced Search
     useEffect(() => {
         if (!searchQuery || searchQuery.trim().length < 2) { setSearchResults([]); return; }
+        if (loading) return;
         const timer = setTimeout(() => {
             const query = searchQuery.trim().toLocaleLowerCase();
             setSearchResults(searchContentForTab(rawData.current, activeTab, searchQuery));
@@ -265,7 +293,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
             setSearchHistory(updated);
         }, 300);
         return () => clearTimeout(timer);
-    }, [searchQuery, activeTab]);
+    }, [searchQuery, activeTab, loading]);
 
     const searchCopy = getSearchCopy(activeTab);
     const tabHistory = useMemo(() => getHistoryForTab(history, activeTab, 10), [activeTab, history]);
@@ -383,11 +411,11 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                         </button>
                     </div>
 
-                    <div className="search-results" aria-label={`${searchCopy.label} search results`}>
+                    <div className="search-results" ref={scrollRef} onScroll={rememberScroll} aria-label={`${searchCopy.label} search results`}>
                         {searchQuery.length >= 2 ? (
                             searchResults.length > 0 ? (
                                 searchResults.map(item => (
-                                    <MediaCard key={item.id} item={item} onSelect={onSelectItem} onPlay={onPlay} watched={hasBeenWatched(item, history)} />
+                                    <MediaCard key={item.id} item={item} onSelect={withChannelContext(onSelectItem, searchResults)} onPlay={withChannelContext(onPlay, searchResults)} watched={hasBeenWatched(item, history)} />
                                 ))
                             ) : (
                                 <div className="no-results">No results found for "{searchQuery}"</div>
@@ -456,7 +484,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                             </div>
                         </div>
                     ) : (
-                        <div className="home-scroll">
+                        <div className="home-scroll" ref={scrollRef} onScroll={rememberScroll}>
                             {activeTab === 'home' ? (
                                 <>
                                     {/* Continue Watching - shows items with progress */}
@@ -511,7 +539,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                         {favorites.length > 0 ? (
                                             <div className="category-slider">
                                                 {favorites.map(item => (
-                                                    <MediaCard key={item.id} item={item} onSelect={onSelectItem} watched={hasBeenWatched(item, history)} />
+                                                    <MediaCard key={item.id} item={item} onSelect={withChannelContext(onSelectItem, sortedStreams)} onPlay={withChannelContext(onPlay, sortedStreams)} watched={hasBeenWatched(item, history)} />
                                                 ))}
                                             </div>
                                         ) : (
@@ -544,7 +572,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                             </div>
                                             <div className="category-slider">
                                                 {cat.items.map(item => (
-                                                    <MediaCard key={item.id} item={item} onSelect={onSelectItem} watched={hasBeenWatched(item, history)} />
+                                                    <MediaCard key={item.id} item={item} onSelect={withChannelContext(onSelectItem, sortedStreams)} onPlay={withChannelContext(onPlay, sortedStreams)} watched={hasBeenWatched(item, history)} />
                                                 ))}
                                             </div>
                                         </div>
@@ -623,7 +651,7 @@ export default function HomeScreen({ onSelectItem, onPlay, activeTab, setActiveT
                                     <div className={`category-grid grid-${activeTab}`}>
                                         {sortedStreams.length > 0 ? (
                                             sortedStreams.map(item => (
-                                                <MediaCard key={item.id} item={item} onSelect={onSelectItem} watched={hasBeenWatched(item, history)} />
+                                                <MediaCard key={item.id} item={item} onSelect={withChannelContext(onSelectItem, sortedStreams)} onPlay={withChannelContext(onPlay, sortedStreams)} watched={hasBeenWatched(item, history)} />
                                             ))
                                         ) : (
                                             <div className="no-results">No content available in this category</div>

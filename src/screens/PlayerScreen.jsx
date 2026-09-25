@@ -42,7 +42,14 @@ const getInitialStartDecision = (item) => {
     };
 };
 
-export default function PlayerScreen({ item, onBack, onPlayNext }) {
+const PrevChannelIcon = () => (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z" /></svg>
+);
+const NextChannelIcon = () => (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z" /></svg>
+);
+
+export default function PlayerScreen({ item, onBack, onPlayNext, onPrevChannel, onNextChannel }) {
     const [playing, setPlaying] = useState(true);
     const [progress, setProgress] = useState(0);
     const [showControls, setShowControls] = useState(true);
@@ -87,6 +94,10 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
     const appliedStartRef = useRef(null);
     const onBackRef = useRef(onBack);
     const onPlayNextRef = useRef(onPlayNext);
+    const channelNavRef = useRef({ prev: onPrevChannel, next: onNextChannel });
+    useEffect(() => {
+        channelNavRef.current = { prev: onPrevChannel, next: onNextChannel };
+    }, [onPrevChannel, onNextChannel]);
 
     useEffect(() => {
         onBackRef.current = onBack;
@@ -385,9 +396,14 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
             subtitle: [item.genre, item.year].filter(Boolean).join(' · '),
             isLive: itemType === 'live',
             startPositionMs: Math.round((itemType === 'live' ? 0 : startDecision.position) * 1000),
+            hasPrev: Boolean(channelNavRef.current.prev),
+            hasNext: Boolean(channelNavRef.current.next),
         }).then((result) => {
             if (cancelled) return;
             setIsBuffering(false);
+
+            if (result?.navigate === 'prev' && channelNavRef.current.prev) { channelNavRef.current.prev(); return; }
+            if (result?.navigate === 'next' && channelNavRef.current.next) { channelNavRef.current.next(); return; }
 
             if (itemType !== 'live' && result?.positionMs > 5000) {
                 saveWatchProgress(item, result.positionMs / 1000, result.durationMs / 1000);
@@ -726,11 +742,19 @@ export default function PlayerScreen({ item, onBack, onPlayNext }) {
 
                 {/* Center play controls */}
                 <div className="player-center">
-                    <button className="player-center-btn" onClick={() => seek(-15)}><SkipBack /></button>
+                    {item?.type === 'live' ? (
+                        onPrevChannel && <button className="player-center-btn" aria-label="Previous channel" onClick={onPrevChannel}><PrevChannelIcon /></button>
+                    ) : (
+                        <button className="player-center-btn" onClick={() => seek(-15)}><SkipBack /></button>
+                    )}
                     <button className="player-main-play" onClick={() => setPlaying(v => !v)}>
                         {playing ? <PauseFill /> : <PlayFill />}
                     </button>
-                    <button className="player-center-btn" onClick={() => seek(15)}><SkipFwd /></button>
+                    {item?.type === 'live' ? (
+                        onNextChannel && <button className="player-center-btn" aria-label="Next channel" onClick={onNextChannel}><NextChannelIcon /></button>
+                    ) : (
+                        <button className="player-center-btn" onClick={() => seek(15)}><SkipFwd /></button>
+                    )}
                 </div>
 
                 {/* Bottom glass controls */}
